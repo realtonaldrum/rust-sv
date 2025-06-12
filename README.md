@@ -2,6 +2,8 @@
 
 A library to build Bitcoin SV applications and infrastructure in Rust.
 
+[![Dependencies](https://deps.rs/repo/github/murphsicles/rust-sv/status.svg)](https://deps.rs/repo/github/murphsicles/rust-sv)
+
 [Documentation](https://docs.rs/sv/)
 
 Features
