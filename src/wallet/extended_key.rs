@@ -252,8 +252,8 @@ impl ExtendedKey {
         let private_key = &self.0[46..];
         let secp_par_secret_key = SecretKey::from_slice(&private_key)?;
         let chain_code = &self.0[13..45];
-        let key = hmac::SigningKey::new(&SHA512, chain_code);
-
+        use ring::hmac;
+        let key = hmac::Key::new(hmac::HMAC_SHA512, chain_code);
         let hmac = if index >= HARDENED_KEY {
             let mut v = Vec::<u8>::with_capacity(37);
             v.push(0);
