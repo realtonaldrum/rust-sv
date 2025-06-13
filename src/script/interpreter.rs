@@ -603,7 +603,8 @@ pub fn eval<T: Checker>(script: &[u8], checker: &mut T, flags: u32) -> Result<()
             OP_SHA1 => {
                 check_stack_size(1, &stack)?;
                 let v = stack.pop().unwrap();
-                let result = digest(&SHA1, &v);
+                use ring::digest::{digest, SHA1_FOR_LEGACY_USE_ONLY};
+                let result = digest(&SHA1_FOR_LEGACY_USE_ONLY, &v);
                 stack.push(result.as_ref().to_vec());
             }
             OP_SHA256 => {
