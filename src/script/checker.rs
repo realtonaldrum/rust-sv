@@ -1,8 +1,8 @@
 use crate::messages::Tx;
 use crate::transaction::sighash::{sighash, SigHashCache, SIGHASH_FORKID};
 use crate::util::{Error, Result};
-use secp256k1::{Message, PublicKey, Secp256k1, Signature};
-
+use secp256k1::{Message, PublicKey, Secp256k1};
+use secp256k1::ecdsa::Signature;
 /// Locktimes greater than or equal to this are interpreted as timestamps. Less then, block heights.
 const LOCKTIME_THRESHOLD: i32 = 500000000;
 
