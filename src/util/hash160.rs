@@ -1,12 +1,9 @@
 use digest::{FixedOutput, Update};
 use hex;
 use ring::digest::{digest, SHA256};
-use digest::Digest;
+use digest::{Digest, Update};
 use ripemd160::Ripemd160;
 use std::fmt;
-let mut hasher = Ripemd160::new();
-hasher.update(data);
-let result = hasher.finalize();
 
 /// 160-bit hash for public key addresses
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
