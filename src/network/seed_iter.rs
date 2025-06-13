@@ -17,17 +17,21 @@ pub struct SeedIter {
 impl SeedIter {
     /// Creates a new seed iterator from a list of DNS seeds
     pub fn new(seeds: &Vec<String>, port: u16) -> SeedIter {
-        SeedIter {
-            seeds: seeds.clone(),
-            port,
-            nodes: Vec::new(),
-            seed_index: 0,
-            node_index: 0,
-            use rand::Rng;
-            random_offset: rand::thread_rng().gen_range(0..100),
+        use rand::Rng;
+
+        pub struct SeedIter {
+            // ... other fields ...
+            random_offset: usize,
         }
-    }
-}
+
+        impl SeedIter {
+            fn new() -> Self {
+                SeedIter {
+                    // ... other fields ...
+                    random_offset: rand::thread_rng().gen_range(0..100),
+                }
+            }
+        }
 
 impl Iterator for SeedIter {
     type Item = (IpAddr, u16);
