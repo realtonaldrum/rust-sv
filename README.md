@@ -20,7 +20,7 @@ Features
 
 # Installation
 
-Add ```sv = "0.2"``` to Cargo.toml
+Add ```sv = "0.3"``` to Cargo.toml
 
 # Known limitations
 
