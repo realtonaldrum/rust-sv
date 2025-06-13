@@ -279,13 +279,12 @@ impl ExtendedKey {
         }
 
         let mut secp_child_secret_key = SecretKey::from_slice(&hmac.as_ref()[..32])?;
-        secp_child_secret_key.add_assign(&private_key)?;
+        secp_child_secret_key.tweak_add_assign(&private_key)?;
 
         let child_chain_code = &hmac.as_ref()[32..];
         let fingerprint = self.fingerprint()?;
         let child_private_key =
-            unsafe { slice::from_raw_parts(secp_child_secret_key.as_ptr(), 32) };
-
+            unsafe { slice::from_raw_parts(secp_child_secret_key.as_c_ptr(), 32) };
         ExtendedKey::new_private_key(
             network,
             self.depth() + 1,
