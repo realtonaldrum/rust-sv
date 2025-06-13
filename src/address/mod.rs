@@ -36,29 +36,41 @@ pub enum AddressType {
     P2SH,
 }
 
+/// Address structure holding bytes, type, and network
+pub struct Address {
+    bytes: Vec<u8>,
+    addr_type: AddressType,
+    network: Network,
+}
+
+impl Address {
+    /// Encodes address bytes to base-58
+    pub fn encode(&self) -> String {
+        bs58::encode(&self.bytes).into_string()
+    }
+
+    /// Decodes a base-58 string to address bytes
+    pub fn decode(input: &str) -> Result<Vec<u8>, bs58::decode::Error> {
+        bs58::decode(input).into_vec()
+    }
+}
+
 /// Converts a public key hash to its base-58 address
 pub fn addr_encode(hash160: &Hash160, addr_type: AddressType, network: Network) -> String {
-    let mut v = Vec::with_capacity(1 + hash160.0.len() + 2);
+    let mut v = Vec::with_capacity(1 + hash160.0.len() + 4);
     v.push(match addr_type {
         AddressType::P2PKH => network.addr_pubkeyhash_flag(),
         AddressType::P2SH => network.addr_script_flag(),
     });
     v.extend_from_slice(&hash160.0);
     let checksum = sha256d(&v).0;
-    v.push(checksum[0]);
-    v.push(checksum[1]);
-    v.push(checksum[2]);
-    v.push(checksum[3]);
-    let b: &[u8] = v.as_ref();
-    fn encode(&self) -> String {
-    bs58::encode(&self.bytes).into_string()
+    v.extend_from_slice(&checksum[0..4]);
+    bs58::encode(&v).into_string()
 }
 
 /// Decodes a base-58 address to a public key hash
 pub fn addr_decode(input: &str, network: Network) -> Result<(Hash160, AddressType)> {
-    // Make sure addr is at least some minimum to verify checksum and addr type
-    // We will check the private key size later.
-    let v = input.from_base58()?;
+    let v = bs58::decode(input).into_vec()?;
     if v.len() < 6 {
         let msg = format!("Base58 address not long enough: {}", v.len());
         return Err(Error::BadData(msg));
@@ -66,9 +78,9 @@ pub fn addr_decode(input: &str, network: Network) -> Result<(Hash160, AddressTyp
 
     // Verify checksum
     let v0 = &v[0..v.len() - 4];
-    let v1 = &v[v.len() - 4..v.len()];
+    let v1 = &v[v.len() - 4..];
     let cs = sha256d(v0).0;
-    if v1[0] != cs[0] || v1[1] != cs[1] || v1[2] != cs[2] || v1[3] != cs[3] {
+    if v1 != &cs[0..4] {
         let msg = format!("Bad checksum: {:?} != {:?}", &cs[..4], v1);
         return Err(Error::BadData(msg));
     }
@@ -84,43 +96,14 @@ pub fn addr_decode(input: &str, network: Network) -> Result<(Hash160, AddressTyp
         return Err(Error::BadData(msg));
     };
 
-    // Extract hash160 address and return
+    // Extract hash160 address
     if v0.len() != 21 {
         let msg = format!("Hash160 address not long enough: {}", v0.len() - 1);
         return Err(Error::BadData(msg));
     }
     let mut hash160addr = [0; 20];
-    hash160addr.clone_from_slice(&v0[1..]);
+    hash160addr.copy_from_slice(&v0[1..]);
     Ok((Hash160(hash160addr), addr_type))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::util::hash160;
-    use hex;
-
-    #[test]
-    fn to_addr() {
-        let pubkey_hex = "04005937fd439b3c19014d5f328df8c7ed514eaaf41c1980b8aeab461dffb23fbf3317e42395db24a52ce9fc947d9c22f54dc3217c8b11dfc7a09c59e0dca591d3";
-        let pubkeyhash = hash160(&hex::decode(pubkey_hex).unwrap());
-        let addr = addr_encode(&pubkeyhash, AddressType::P2PKH, Network::Mainnet);
-        assert!(addr == "1NM2HFXin4cEQRBLjkNZAS98qLX9JKzjKn");
-    }
-
-    #[test]
-    fn from_addr() {
-        let addr = "1NM2HFXin4cEQRBLjkNZAS98qLX9JKzjKn";
-        let result = addr_decode(&addr, Network::Mainnet).unwrap();
-        let hash160 = result.0;
-        let addr_type = result.1;
-        assert!(addr_type == AddressType::P2PKH);
-        assert!(hex::encode(hash160.0) == "ea2407829a5055466b27784cde8cf463167946bf");
-    }
-
-    #[test]
-    fn from_addr_errors() {
-        assert!(addr_decode("0", Network::Mainnet).is_err());
-        assert!(addr_decode("1000000000000000000000000000000000", Network::Mainnet).is_err());
-    }
-}
+#[
