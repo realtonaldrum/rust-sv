@@ -9,8 +9,8 @@ use digest::{FixedOutput, Input};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use ring::digest::{digest, SHA1_FOR_LEGACY_USE_ONLY, SHA256};
-use ripemd160::{Digest, Ripemd160};
-
+use digest::Digest;
+use ripemd160::Ripemd160;
 // Stack capacity defaults, which may exceeded
 const STACK_CAPACITY: usize = 100;
 const ALT_STACK_CAPACITY: usize = 10;
