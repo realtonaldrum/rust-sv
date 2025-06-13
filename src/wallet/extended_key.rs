@@ -308,7 +308,8 @@ impl ExtendedKey {
         }
 
         let chain_code = &self.0[13..45];
-        let key = hmac::SigningKey::new(&SHA512, chain_code);
+        use ring::hmac;
+        let key = hmac::Key::new(hmac::HMAC_SHA512, chain_code);
         let mut v = Vec::<u8>::with_capacity(65);
         let public_key = self.public_key()?;
         v.extend_from_slice(&public_key);
