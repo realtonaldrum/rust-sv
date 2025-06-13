@@ -8,7 +8,7 @@ mod bloom_filter;
 #[allow(dead_code)]
 mod future;
 #[allow(dead_code)]
-mod hash160;
+pub mod hash160;
 mod hash256;
 #[allow(dead_code)]
 mod latch;
