@@ -25,7 +25,7 @@
 //!
 use crate::network::Network;
 use crate::util::{sha256d, Error, Hash160, Result};
-use rust_base58::base58::{FromBase58, ToBase58};
+use bs58;
 
 /// Address type which is either P2PKH or P2SH
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,7 +50,8 @@ pub fn addr_encode(hash160: &Hash160, addr_type: AddressType, network: Network) 
     v.push(checksum[2]);
     v.push(checksum[3]);
     let b: &[u8] = v.as_ref();
-    b.to_base58()
+    fn encode(&self) -> String {
+    bs58::encode(&self.bytes).into_string()
 }
 
 /// Decodes a base-58 address to a public key hash
