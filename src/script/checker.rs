@@ -78,7 +78,7 @@ impl<'a> Checker for TransactionChecker<'a> {
         let mut signature = Signature::from_der(der_sig)?;
         // OpenSSL-generated signatures may not be normalized, but libsecp256kq requires them to be
         signature.normalize_s();
-        let message = Message::from_slice(&sig_hash.0)?;
+        let message = Message::from_digest(sig_hash.0)?;
         let public_key = PublicKey::from_slice(&pubkey)?;
         Ok(secp.verify_ecdsa(message, &signature, &public_key).is_ok())
     }
