@@ -77,8 +77,8 @@ impl Address {
         let payload = &bytes[..bytes.len() - 4];
         let checksum_provided = &bytes[bytes.len() - 4..];
         let checksum_computed = &sha256d(payload).0[..4];
-if let checksum_computed = &sha256d(payload).0[..4];
-if *checksum_provided != *checksum_computed {
+        let checksum_computed = &sha256d(payload).0[..4];
+        if *checksum_provided != *checksum_computed {
             return Err(Error::BadData(format!(
                 "Checksum mismatch: expected {:?}, got {:?}",
                 checksum_computed, checksum_provided
@@ -109,8 +109,8 @@ if *checksum_provided != *checksum_computed {
 /// Converts a public key hash to a base58 address.
 pub fn addr_encode(hash160: &Hash160, addr_type: AddressType, network: Network) -> String {
     let mut payload = vec![match addr_type {
-        AddressType::P2PKH => network.addr_pubkeyhash_flag(),
-        AddressType::P2SH => network.addr_script_flag(),
+        AddressType::P2PKH => self.network.addr_pubkeyhash_flag(),
+        AddressType::P2SH => self.network.addr_script_flag(),
     }];
     payload.extend_from_slice(&hash160.0);
     let checksum = sha256d(&payload).0[..4].to_vec();
