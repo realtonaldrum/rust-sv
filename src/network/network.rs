@@ -12,12 +12,15 @@ pub enum Network {
     STN = 2,
 }
 
-impl Network {
-    // NEW: Store seeds persistently
+// NEW: Define struct with fields
+pub struct NetworkConfig {
+    network: Network,
     seeds: Vec<String>,
     port: u16,
+}
 
-    /// Creates a new Network instance with pre-defined seeds and port
+impl NetworkConfig {
+    /// Creates a new NetworkConfig instance with pre-defined seeds and port
     pub fn new(network_type: u8) -> Result<Self> {
         let network = match network_type {
             x if x == Network::Mainnet as u8 => Network::Mainnet,
@@ -69,7 +72,7 @@ impl Network {
 
     /// Returns the magic bytes for the message headers
     pub fn magic(&self) -> [u8; 4] {
-        match self {
+        match self.network {
             Network::Mainnet => [0xe3, 0xe1, 0xf3, 0xe8],
             Network::Testnet => [0xf4, 0xe5, 0xf3, 0xf4],
             Network::STN => [0xfb, 0xce, 0xc4, 0xf9],
@@ -78,7 +81,7 @@ impl Network {
 
     /// Returns the genesis block
     pub fn genesis_block(&self) -> Block {
-        match self {
+        match self.network {
             Network::Mainnet => {
                 let header = BlockHeader {
                     version: 1,
@@ -154,7 +157,7 @@ impl Network {
 
     /// Returns the genesis block hash
     pub fn genesis_hash(&self) -> Hash256 {
-        match self {
+        match self.network {
             Network::Mainnet => {
                 Hash256::decode("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
                     .unwrap()
@@ -168,7 +171,7 @@ impl Network {
 
     /// Returns the version byte flag for P2PKH-type addresses
     pub fn addr_pubkeyhash_flag(&self) -> u8 {
-        match self {
+        match self.network {
             Network::Mainnet => 0x00,
             Network::Testnet => 0x6f,
             Network::STN => 0x6f,
@@ -177,7 +180,7 @@ impl Network {
 
     /// Returns the version byte flag for P2SH-type addresses
     pub fn addr_script_flag(&self) -> u8 {
-        match self {
+        match self.network {
             Network::Mainnet => 0x05,
             Network::Testnet => 0xc4,
             Network::STN => 0xc4,
@@ -186,11 +189,11 @@ impl Network {
 
     /// Returns a list of DNS seeds for finding initial nodes
     pub fn seeds(&self) -> &[String] {
-        &self.seeds // CHANGED: Return slice of stored seeds
+        &self.seeds
     }
 
     /// Creates a new DNS seed iterator for this network
     pub fn seed_iter(&self) -> SeedIter {
-        SeedIter::new(self.seeds(), self.port()) // CHANGED: Use persistent seeds
+        SeedIter::new(self.seeds(), self.port())
     }
 }
