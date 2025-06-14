@@ -6,6 +6,7 @@ use ring::digest::SHA512;
 use ring::hmac;
 use bs58;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
+use secp256k1::secp256k1_sys::CPtr;
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
@@ -279,8 +280,8 @@ impl ExtendedKey {
             return Err(Error::IllegalState(msg));
         }
 
-        let mut secp_child_secret_key = SecretKey::from_slice(&hmac.as_ref()[..32])?;
-        secp_child_secret_key.add_tweak(&private_key.into())?;
+        let secp_par_secret_key = SecretKey::from_slice(&private_key)?;
+        secp_child_secret_key.add_tweak(&secp_par_secret_key.into())?;
 
         let child_chain_code = &hmac.as_ref()[32..];
         let fingerprint = self.fingerprint()?;
@@ -351,7 +352,7 @@ impl ExtendedKey {
         let mut v = Vec::with_capacity(82);
         v.extend_from_slice(&self.0);
         v.extend_from_slice(&checksum.0[..4]);
-        bs58::encode(&v).into_string();
+        bs58::encode(&v).into_string()
     }
 
     /// Decodes an extended key from a string
