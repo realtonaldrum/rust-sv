@@ -1,7 +1,6 @@
-use digest::{FixedOutput, Update}; // Remove if unused after fixing
 use hex;
 use ring::digest::{digest, SHA256};
-use ripemd160::Ripemd160Digest; // Changed from Ripemd160
+use ripemd160::Ripemd160Digest;
 use std::fmt;
 
 /// 160-bit hash for public key addresses
