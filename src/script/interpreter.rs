@@ -5,7 +5,6 @@ use crate::script::stack::{
 use crate::script::Checker;
 use crate::transaction::sighash::SIGHASH_FORKID;
 use crate::util::{hash160, lshift, rshift, sha256d, Error, Result};
-use digest::{FixedOutput, Update};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use ring::digest::{digest, SHA256};
