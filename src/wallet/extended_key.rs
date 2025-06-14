@@ -6,7 +6,7 @@ use ring::digest::SHA512;
 use ring::hmac;
 use bs58;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
-use secp256k1::secp256k1_sys::CPtr;
+use secp256k1_sys::CPtr;
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
