@@ -12,7 +12,7 @@ pub enum Network {
     STN = 2,
 }
 
-// NEW: Define struct with fields
+/// Network configuration with persistent seeds and port
 pub struct NetworkConfig {
     network: Network,
     seeds: Vec<String>,
@@ -20,17 +20,9 @@ pub struct NetworkConfig {
 }
 
 impl NetworkConfig {
-    /// Creates a new NetworkConfig instance with pre-defined seeds and port
+    /// Creates a new NetworkConfig instance
     pub fn new(network_type: u8) -> Result<Self> {
-        let network = match network_type {
-            x if x == Network::Mainnet as u8 => Network::Mainnet,
-            x if x == Network::Testnet as u8 => Network::Testnet,
-            x if x == Network::STN as u8 => Network::STN,
-            _ => {
-                let msg = format!("Unknown network type: {}", x);
-                return Err(Error::BadArgument(msg));
-            }
-        };
+        let network = Self::from_u8(network_type)?;
         let seeds = match network {
             Network::Mainnet => vec![
                 "seed.bitcoinsv.io".to_string(),
@@ -55,13 +47,10 @@ impl NetworkConfig {
     /// Converts an integer to a network type
     pub fn from_u8(x: u8) -> Result<Network> {
         match x {
-            x if x == Network::Mainnet as u8 => Ok(Network::Mainnet),
-            x if x == Network::Testnet as u8 => Ok(Network::Testnet),
-            x if x == Network::STN as u8 => Ok(Network::STN),
-            _ => {
-                let msg = format!("Unknown network type: {}", x);
-                Err(Error::BadArgument(msg))
-            }
+            0 => Ok(Network::Mainnet),
+            1 => Ok(Network::Testnet),
+            2 => Ok(Network::STN),
+            _ => Err(Error::BadArgument(format!("Unknown network type: {}", x))),
         }
     }
 
@@ -70,7 +59,7 @@ impl NetworkConfig {
         self.port
     }
 
-    /// Returns the magic bytes for the message headers
+    /// Returns the magic bytes for message headers
     pub fn magic(&self) -> [u8; 4] {
         match self.network {
             Network::Mainnet => [0xe3, 0xe1, 0xf3, 0xe8],
@@ -94,7 +83,6 @@ impl NetworkConfig {
                     bits: 0x1d00ffff,
                     nonce: 2083236893,
                 };
-
                 let tx = Tx {
                     version: 1,
                     inputs: vec![TxIn {
@@ -111,7 +99,6 @@ impl NetworkConfig {
                     }],
                     lock_time: 0,
                 };
-
                 Block {
                     header,
                     txns: vec![tx],
@@ -129,7 +116,6 @@ impl NetworkConfig {
                     bits: 0x1d00ffff,
                     nonce: 414098458,
                 };
-
                 let tx = Tx {
                     version: 1,
                     inputs: vec![TxIn {
@@ -146,7 +132,6 @@ impl NetworkConfig {
                     }],
                     lock_time: 0,
                 };
-
                 Block {
                     header,
                     txns: vec![tx],
@@ -187,12 +172,12 @@ impl NetworkConfig {
         }
     }
 
-    /// Returns a list of DNS seeds for finding initial nodes
+    /// Returns a list of DNS seeds
     pub fn seeds(&self) -> &[String] {
         &self.seeds
     }
 
-    /// Creates a new DNS seed iterator for this network
+    /// Creates a new DNS seed iterator
     pub fn seed_iter(&self) -> SeedIter {
         SeedIter::new(self.seeds(), self.port())
     }
