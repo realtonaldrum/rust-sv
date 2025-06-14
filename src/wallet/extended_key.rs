@@ -1,9 +1,6 @@
 use crate::network::Network;
 use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
-use digest::Digest;
-use ring::digest::SHA512;
-use ring::hmac;
 use bs58;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use secp256k1_sys::CPtr;
@@ -280,7 +277,7 @@ impl ExtendedKey {
             return Err(Error::IllegalState(msg));
         }
 
-        let mut secp_child_secret_key = SecretKey::from_slice(&hmac.as_ref()[..32])?;
+        let secp_child_secret_key = SecretKey::from_slice(&hmac.as_ref()[..32])?;
         let secp_par_secret_key = SecretKey::from_slice(&private_key)?;
         secp_child_secret_key.add_tweak(&secp_par_secret_key.into())?;
 
