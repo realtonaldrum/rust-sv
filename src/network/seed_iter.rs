@@ -17,7 +17,7 @@
 
 use dns_lookup::lookup_host;
 use log::{error, info};
-use rand::{rngs::ThreadRng, rng, Rng}; // Updated: thread_rng -> rng, added rngs::ThreadRng
+use rand::{rng, Rng};
 use std::net::IpAddr;
 
 /// Iterates through DNS seeds semi-randomly to resolve Bitcoin SV node addresses.
