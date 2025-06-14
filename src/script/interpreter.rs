@@ -591,13 +591,13 @@ pub fn eval<T: Checker>(script: &[u8], checker: &mut T, flags: u32) -> Result<()
                 stack.push(e);
             }
             OP_RIPEMD160 => {
-                check_stack_size(1, &stack)?;
-                let v = stack.pop().unwrap();
-                let mut ripemd160 = Ripemd160::new();
-                ripemd160.process(v.as_ref());
-                let result = ripemd160.fixed_result().to_vec();
-                stack.push(result);
-            }
+            check_stack_size(1, &stack)?;
+            let v = stack.pop().unwrap();
+            let mut ripemd160 = Ripemd160::new();
+            ripemd160.update(v.as_ref());
+            let result = ripemd160.finalize().to_vec();
+            stack.push(result);
+        }
             OP_SHA1 => {
                 check_stack_size(1, &stack)?;
                 let v = stack.pop().unwrap();
