@@ -30,7 +30,7 @@
 //! ```
 
 use crate::util::{Hash256, Result};
-use secp256k1::ecdsa::{Signature, SerializedSignature};
+use secp256k1::{Secp256k1, Message, SecretKey};
 
 pub mod p2pkh;
 pub mod sighash;
