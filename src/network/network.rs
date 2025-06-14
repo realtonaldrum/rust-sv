@@ -13,6 +13,42 @@ pub enum Network {
 }
 
 impl Network {
+    // NEW: Store seeds persistently
+    seeds: Vec<String>,
+    port: u16,
+
+    /// Creates a new Network instance with pre-defined seeds and port
+    pub fn new(network_type: u8) -> Result<Self> {
+        let network = match network_type {
+            x if x == Network::Mainnet as u8 => Network::Mainnet,
+            x if x == Network::Testnet as u8 => Network::Testnet,
+            x if x == Network::STN as u8 => Network::STN,
+            _ => {
+                let msg = format!("Unknown network type: {}", x);
+                return Err(Error::BadArgument(msg));
+            }
+        };
+        let seeds = match network {
+            Network::Mainnet => vec![
+                "seed.bitcoinsv.io".to_string(),
+                "seed.cascharia.com".to_string(),
+                "seed.satoshisvision.network".to_string(),
+            ],
+            Network::Testnet => vec![
+                "testnet-seed.bitcoinsv.io".to_string(),
+                "testnet-seed.cascharia.com".to_string(),
+                "testnet-seed.bitcoincloud.net".to_string(),
+            ],
+            Network::STN => vec!["stn-seed.bitcoinsv.io".to_string()],
+        };
+        let port = match network {
+            Network::Mainnet => 8333,
+            Network::Testnet => 18333,
+            Network::STN => 9333,
+        };
+        Ok(Self { network, seeds, port })
+    }
+
     /// Converts an integer to a network type
     pub fn from_u8(x: u8) -> Result<Network> {
         match x {
@@ -28,11 +64,7 @@ impl Network {
 
     /// Returns the default TCP port
     pub fn port(&self) -> u16 {
-        match self {
-            Network::Mainnet => 8333,
-            Network::Testnet => 18333,
-            Network::STN => 9333,
-        }
+        self.port
     }
 
     /// Returns the magic bytes for the message headers
@@ -153,24 +185,12 @@ impl Network {
     }
 
     /// Returns a list of DNS seeds for finding initial nodes
-    pub fn seeds(&self) -> Vec<String> {
-        match self {
-            Network::Mainnet => vec![
-                "seed.bitcoinsv.io".to_string(),
-                "seed.cascharia.com".to_string(),
-                "seed.satoshisvision.network".to_string(),
-            ],
-            Network::Testnet => vec![
-                "testnet-seed.bitcoinsv.io".to_string(),
-                "testnet-seed.cascharia.com".to_string(),
-                "testnet-seed.bitcoincloud.net".to_string(),
-            ],
-            Network::STN => vec!["stn-seed.bitcoinsv.io".to_string()],
-        }
+    pub fn seeds(&self) -> &[String] {
+        &self.seeds // CHANGED: Return slice of stored seeds
     }
 
     /// Creates a new DNS seed iterator for this network
     pub fn seed_iter(&self) -> SeedIter {
-        SeedIter::new(&self.seeds(), self.port())
+        SeedIter::new(self.seeds(), self.port()) // CHANGED: Use persistent seeds
     }
 }
