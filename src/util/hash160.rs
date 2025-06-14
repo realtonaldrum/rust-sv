@@ -1,7 +1,6 @@
 use digest::{FixedOutput, Update};
 use hex;
 use ring::digest::{digest, SHA256};
-use digest::{Digest, Update};
 use ripemd160::Ripemd160;
 use std::fmt;
 
