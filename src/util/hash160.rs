@@ -1,7 +1,7 @@
-use digest::{FixedOutput, Update};
+use digest::{FixedOutput, Update}; // Remove if unused after fixing
 use hex;
 use ring::digest::{digest, SHA256};
-use ripemd160::Ripemd160Digest;
+use ripemd160::Ripemd160Digest; // Changed from Ripemd160
 use std::fmt;
 
 /// 160-bit hash for public key addresses
@@ -11,10 +11,10 @@ pub struct Hash160(pub [u8; 20]);
 /// Hashes a data array once with SHA256 and again with RIPEMD160
 pub fn hash160(data: &[u8]) -> Hash160 {
     let sha256 = digest(&SHA256, data);
-    let mut ripemd160 = Ripemd160::new();
-    ripemd160.process(sha256.as_ref());
+    let mut ripemd160 = Ripemd160Digest::new();
+    ripemd160.update(sha256.as_ref()); // Changed from process
     let mut hash160 = [0; 20];
-    hash160.clone_from_slice(&ripemd160.fixed_result());
+    hash160.copy_from_slice(&ripemd160.finalize()); // Changed from fixed_result
     Hash160(hash160)
 }
 
