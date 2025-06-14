@@ -104,7 +104,7 @@ impl Peer {
     pub fn connect(
         ip: IpAddr,
         port: u16,
-        network: Network,
+        network: NetworkConfig,
         version: Version,
         filter: Arc<dyn PeerFilter>,
     ) -> Arc<Peer> {
