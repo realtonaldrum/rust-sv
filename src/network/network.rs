@@ -5,7 +5,7 @@ use crate::util::{Error, Hash256, Result};
 use hex;
 
 /// Network type
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Network {
     Mainnet = 0,
     Testnet = 1,
@@ -13,6 +13,7 @@ pub enum Network {
 }
 
 /// Network configuration with persistent seeds and port
+#[derive(Debug, Clone, PartialEq)]
 pub struct NetworkConfig {
     network: Network,
     seeds: Vec<String>,
@@ -90,12 +91,12 @@ impl NetworkConfig {
                             hash: Hash256([0; 32]),
                             index: 0xffffffff,
                         },
-                        unlock_script: Script(hex::decode("04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73").unwrap()),
+                        unlock_script: Script(hex::decode("04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e642062616c606c6f757420666f722062616e6b73").unwrap()),
                         sequence: 0xffffffff,
                     }],
                     outputs: vec![TxOut {
                         satoshis: 5000000000,
-                        lock_script: Script(hex::decode("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
+                        lock_script: Script(hex!("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
                     }],
                     lock_time: 0,
                 };
@@ -123,12 +124,12 @@ impl NetworkConfig {
                             hash: Hash256([0; 32]),
                             index: 0xffffffff,
                         },
-                        unlock_script: Script(hex::decode("04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73").unwrap()),
+                        unlock_script: Script(hex::decode("04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e642062616c606c6f757420666f722062616e6b73").unwrap()),
                         sequence: 0xffffffff,
                     }],
                     outputs: vec![TxOut {
                         satoshis: 5000000000,
-                        lock_script: Script(hex::decode("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
+                        lock_script: Script(hex!("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
                     }],
                     lock_time: 0,
                 };
