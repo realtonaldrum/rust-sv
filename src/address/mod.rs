@@ -76,8 +76,8 @@ impl Address {
 
         let payload = &bytes[..bytes.len() - 4];
         let checksum_provided = &bytes[bytes.len() - 4..];
-        let checksum_computed = sha256d(payload).0[..4];
-        if checksum_provided != checksum_computed {
+        let checksum_computed = &sha256d(payload).0[..4];
+if *checksum_provided != checksum_computed {
             return Err(Error::BadData(format!(
                 "Checksum mismatch: expected {:?}, got {:?}",
                 checksum_computed, checksum_provided
