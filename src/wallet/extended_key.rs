@@ -280,6 +280,7 @@ impl ExtendedKey {
             return Err(Error::IllegalState(msg));
         }
 
+        let mut secp_child_secret_key = SecretKey::from_slice(&hmac.as_ref()[..32])?;
         let secp_par_secret_key = SecretKey::from_slice(&private_key)?;
         secp_child_secret_key.add_tweak(&secp_par_secret_key.into())?;
 
