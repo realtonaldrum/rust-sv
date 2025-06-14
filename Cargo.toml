@@ -9,6 +9,7 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
+bs58 = "0.5.1"
 byteorder = "1.5.0"
 digest = "0.10.7"
 dns-lookup = "2.0.4"
@@ -21,7 +22,6 @@ num-traits = "0.2.19"
 rand = "0.9.1"
 ring = "0.17.14"
 ripemd160 = "0.10.0"
-bs58 = "0.5.1"
 secp256k1 = "0.31.0"
 snowflake = "1.3.0"
 
