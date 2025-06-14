@@ -1,5 +1,5 @@
 use crate::messages::{Message, MessageHeader, Ping, Version, NODE_BITCOIN_CASH, NODE_NETWORK};
-use crate::network::Network;
+use crate::network::NetworkConfig;
 use crate::peer::atomic_reader::AtomicReader;
 use crate::util::rx::{Observable, Observer, Single, Subject};
 use crate::util::{secs_since, Error, Result};
@@ -79,7 +79,7 @@ pub struct Peer {
     /// Port
     pub port: u16,
     /// Network
-    pub network: Network,
+    pub network: NetworkConfig,
 
     pub(crate) connected_event: Single<PeerConnected>,
     pub(crate) disconnected_event: Single<PeerDisconnected>,
