@@ -1,6 +1,6 @@
 use hex;
 use ring::digest::{digest, SHA256};
-use ripemd160::Ripemd160Digest;
+use ripemd160::Ripemd160;
 use std::fmt;
 
 /// 160-bit hash for public key addresses
