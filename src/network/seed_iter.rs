@@ -45,8 +45,8 @@ impl<'a> SeedIter<'a> {
     /// * `seeds` - Slice of DNS seed hostnames (e.g., ["seed.bitcoinsv.io"]).
     /// * `port` - Port to pair with resolved IPs (e.g., 8333 for mainnet).
     pub fn new(seeds: &'a [String], port: u16) -> Self {
-        let mut rng = thread_rng();
-        let random_offset = rng.gen_range(0..100);
+        let mut rng = rng();
+        let random_offset = rng.random_range(0..100);
         Self {
             port,
             seeds,
