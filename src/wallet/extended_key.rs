@@ -10,6 +10,7 @@ use std::io;
 use std::io::{Cursor, Read, Write};
 use std::slice;
 
+// ... (rest of the code unchanged, remove inline `use ring::hmac;` in derive_private_key and derive_public_key)
 /// Maximum private key value (exclusive)
 const SECP256K1_CURVE_ORDER: [u8; 32] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
