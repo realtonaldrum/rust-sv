@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 //! Iterates over Bitcoin SV DNS seeds to resolve IP addresses semi-randomly.
 //!
 //! The `SeedIter` struct provides an iterator over IP addresses resolved from a list
