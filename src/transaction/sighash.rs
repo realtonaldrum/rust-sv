@@ -2,9 +2,9 @@
 
 use crate::address::addr_decode;
 use crate::network::NetworkConfig;
-use crate::messages::{Tx, TxIn, TxOut};
-use crate::script::Script;
-use crate::util::{hash256, Error, Result, Serializable};
+use crate::messages::{message::Payload, OutPoint, Tx, TxIn, TxOut};
+use crate::script::{next_op, op_codes, Script};
+use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d};
 use byteorder::{LittleEndian, WriteBytesExt};
 use ring::digest::{digest, SHA256};
 use std::io::Write;
