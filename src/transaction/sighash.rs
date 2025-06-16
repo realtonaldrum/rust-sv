@@ -261,7 +261,7 @@ mod tests {
     use hex;
 
     #[test]
-    fn bip143_sighash_test() -> Result<(), crate::util::Error> {
+    fn bip143_sighash_test() -> Result<()> {
         let lock_script =
             hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac").unwrap();
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
