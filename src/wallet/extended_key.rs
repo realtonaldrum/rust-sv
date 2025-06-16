@@ -484,7 +484,20 @@ mod tests {
         assert!(!is_private_key_valid(&[0xff; 32]));
         assert!(!is_private_key_valid(&SECP256K1_CURVE_ORDER));
     }
+    #[test]
+    fn path() {
+        let m = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about").unwrap(); // Adjust if test uses a different phrase
+        let derived = derive_extended_key(&m, "m/0H").unwrap();
+        let encoded = derived.encode();
+        eprintln!("Actual xprv: {}", encoded);
+        eprintln!("Expected xprv: xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7");
+        assert_eq!(
+            encoded,
+            "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7"
+        );
+    }
 
+    
     #[test]
     fn path() {
         // BIP-32 test vector 1
