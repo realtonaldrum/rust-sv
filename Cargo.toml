@@ -9,7 +9,6 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-bip39 = "0.9"
 bs58 = "0.5.1"
 byteorder = "1.5.0"
 digest = "0.10.7"
