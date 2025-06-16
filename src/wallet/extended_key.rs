@@ -484,14 +484,10 @@ mod tests {
         assert!(!is_private_key_valid(&[0xff; 32]));
         assert!(!is_private_key_valid(&SECP256K1_CURVE_ORDER));
     }
-    #[test]
-    #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::wallet::Mnemonic; // Corrected import
 
     #[test]
     fn path() {
+        use crate::wallet::mnemonic::Mnemonic;
         let m = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about").unwrap();
         let derived = derive_extended_key(&m, "m/0H").unwrap();
         let encoded = derived.encode();
@@ -502,7 +498,6 @@ mod tests {
             "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7"
         );
     }
-}
     
     #[test]
     fn path() {
