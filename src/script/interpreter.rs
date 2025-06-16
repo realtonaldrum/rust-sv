@@ -2,13 +2,12 @@ use crate::script::op_codes::*;
 use crate::script::stack::{
     decode_bigint, decode_bool, encode_bigint, encode_num, pop_bigint, pop_bool, pop_num,
 };
-use crate::script::Checker;
 use crate::transaction::sighash::SIGHASH_FORKID;
 use crate::util::{hash160, lshift, rshift, sha256d, Error, Result};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use ring::digest::{digest, SHA256};
-use ripemd::{Ripemd160, Digest};
+use ripemd::{Ripemd160, Digest}; // Updated import
 // Stack capacity defaults, which may exceeded
 const STACK_CAPACITY: usize = 100;
 const ALT_STACK_CAPACITY: usize = 10;
@@ -591,13 +590,13 @@ pub fn eval<T: Checker>(script: &[u8], checker: &mut T, flags: u32) -> Result<()
                 stack.push(e);
             }
             OP_RIPEMD160 => {
-            check_stack_size(1, &stack)?;
-            let v = stack.pop().unwrap();
-            let mut ripemd160 = Ripemd160::new();
-            ripemd160.update(v.as_ref());
-            let result = ripemd160.finalize().to_vec();
-            stack.push(result);
-        }
+                check_stack_size(1, &stack)?;
+                let v = stack.pop().unwrap();
+                let mut ripemd160 = Ripemd160::new(); // Updated line
+                ripemd160.update(v.as_ref());
+                let result = ripemd160.finalize().to_vec();
+                stack.push(result);
+            }
             OP_SHA1 => {
                 check_stack_size(1, &stack)?;
                 let v = stack.pop().unwrap();
