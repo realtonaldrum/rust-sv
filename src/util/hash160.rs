@@ -1,6 +1,6 @@
 use hex;
 use ring::digest::{digest, SHA256};
-use ripemd160::ripemd::Ripemd160;
+use ripemd::Ripemd160;
 use std::fmt;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
