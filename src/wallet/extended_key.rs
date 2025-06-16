@@ -486,7 +486,7 @@ mod tests {
     }
     #[test]
     fn path() {
-        use bip39::Mnemonic;
+        use crate::wallet::mnemonic::Mnemonic;
         let m = Mnemonic::from_phrase("all all all all all all all all all all all all").unwrap();
         let derived = derive_extended_key(&m, "m/0H").unwrap();
         let encoded = derived.encode();
