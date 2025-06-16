@@ -1,6 +1,5 @@
 use hex;
 use ring::digest::{digest, SHA256};
-use digest::core_api::CoreWrapper;
 use ripemd::{Ripemd160, Digest};
 use std::fmt;
 
