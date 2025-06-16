@@ -12,9 +12,9 @@ use std::io::Write;
 pub const SIGHASH_ALL: u8 = 0x01;
 /// Sign none of the outputs so that they may be spent anywhere
 pub const SIGHASH_NONE: u8 = 0x02;
-/// Sign only the output paired with the the input
+/// Sign only the output paired with the input
 pub const SIGHASH_SINGLE: u8 = 0x03;
-/// Sign only the input so others may inputs to the transaction
+/// Sign only the input so others may add inputs to the transaction
 pub const SIGHASH_ANYONECANPAY: u8 = 0x80;
 /// Bitcoin Cash / SV sighash flag for use on outputs after the fork
 pub const SIGHASH_FORKID: u8 = 0x40;
@@ -72,8 +72,8 @@ impl SigHashCache {
 
 /// Generates a transaction digest for signing using BIP-143
 ///
-/// This is to be used for all tranasctions after the August 2017 fork.
-/// It fixing quadratic hashing and includes the satoshis spent in the hash.
+/// This is to be used for all transactions after the August 2017 fork.
+/// It fixes quadratic hashing and includes the satoshis spent in the hash.
 fn bip143_sighash(
     tx: &Tx,
     n_input: usize,
@@ -256,7 +256,6 @@ mod tests {
     use super::*;
     use crate::address::addr_decode;
     use crate::messages::{OutPoint, TxIn};
-    use crate::network::Network;
     use crate::transaction::p2pkh;
     use hex;
 
@@ -300,6 +299,7 @@ mod tests {
         assert!(cache.hash_prevouts.is_some());
         assert!(cache.hash_sequence.is_some());
         assert!(cache.hash_outputs.is_some());
+        Ok(())
     }
 
     #[test]
