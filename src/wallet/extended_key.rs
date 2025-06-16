@@ -486,7 +486,8 @@ mod tests {
     }
     #[test]
     fn path() {
-        let m = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about").unwrap(); // Adjust if test uses a different phrase
+        use crate::wallet::mnemonic::Mnemonic;
+        let m = Mnemonic::from_phrase("all all all all all all all all all all all all").unwrap(); // Adjust to original phrase
         let derived = derive_extended_key(&m, "m/0H").unwrap();
         let encoded = derived.encode();
         eprintln!("Actual xprv: {}", encoded);
@@ -496,7 +497,6 @@ mod tests {
             "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7"
         );
     }
-
     
     #[test]
     fn path() {
