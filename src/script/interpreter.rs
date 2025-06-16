@@ -1,13 +1,10 @@
-use crate::script::op_codes::*;
-use crate::script::stack::{
-    decode_bigint, decode_bool, encode_bigint, encode_num, pop_bigint, pop_bool, pop_num,
-};
+use crate::script::{op_codes::*, stack::*, Checker}; // Updated import
 use crate::transaction::sighash::SIGHASH_FORKID;
 use crate::util::{hash160, lshift, rshift, sha256d, Error, Result};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use ring::digest::{digest, SHA256};
-use ripemd::{Ripemd160, Digest}; // Updated import
+use ripemd::{Ripemd160, Digest};
 // Stack capacity defaults, which may exceeded
 const STACK_CAPACITY: usize = 100;
 const ALT_STACK_CAPACITY: usize = 10;
