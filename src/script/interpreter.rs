@@ -1,10 +1,12 @@
-use crate::script::{op_codes::*, stack::*, Checker}; // Updated import
+use crate::script::{op_codes::*, stack::*, Checker};
 use crate::transaction::sighash::SIGHASH_FORKID;
 use crate::util::{hash160, lshift, rshift, sha256d, Error, Result};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use ring::digest::{digest, SHA256};
 use ripemd::{Ripemd160, Digest};
+use std::convert::AsRef;
+
 // Stack capacity defaults, which may exceeded
 const STACK_CAPACITY: usize = 100;
 const ALT_STACK_CAPACITY: usize = 10;
@@ -590,7 +592,7 @@ pub fn eval<T: Checker>(script: &[u8], checker: &mut T, flags: u32) -> Result<()
                 check_stack_size(1, &stack)?;
                 let v = stack.pop().unwrap();
                 let mut ripemd160 = Ripemd160::new();
-                ripemd160.update(v.as_ref::<[u8]>());
+                ripemd160.update(AsRef::<[u8]>::as_ref(&v));
                 let result = ripemd160.finalize().to_vec();
                 stack.push(result);
             }
