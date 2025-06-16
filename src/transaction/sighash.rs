@@ -1,6 +1,7 @@
 //! Transaction sighash helpers
 
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
+use crate::network::NetworkConfig;
 use crate::script::{next_op, op_codes, Script};
 use crate::util::{sha256d, var_int, Error, Hash256, Result, Serializable};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -263,7 +264,7 @@ mod tests {
         let lock_script =
             hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac").unwrap();
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
-        let hash160 = addr_decode(addr, Network::Testnet).unwrap().0;
+        let hash160 = addr_decode(addr, NetworkConfig::Testnet).unwrap().0;
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
