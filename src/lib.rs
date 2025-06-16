@@ -10,7 +10,6 @@ extern crate linked_hash_map;
 extern crate murmur3;
 extern crate rand;
 extern crate ring;
-extern crate ripemd160;
 extern crate secp256k1;
 extern crate snowflake;
 
