@@ -486,8 +486,8 @@ mod tests {
     }
     #[test]
     fn path() {
-        use crate::wallet::mnemonic::Mnemonic;
-        let m = Mnemonic::from_phrase("all all all all all all all all all all all all").unwrap(); // Adjust to original phrase
+        use crate::mnemonic::Mnemonic;
+        let m = Mnemonic::from_phrase("all all all all all all all all all all all all").unwrap();
         let derived = derive_extended_key(&m, "m/0H").unwrap();
         let encoded = derived.encode();
         eprintln!("Actual xprv: {}", encoded);
