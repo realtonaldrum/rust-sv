@@ -676,7 +676,7 @@ mod tests {
     fn master_private_key(seed: &str) -> ExtendedKey {
         let seed = hex::decode(seed).unwrap();
         let key = "Bitcoin seed".to_string();
-        let key = hmac::SigningKey::new(&SHA512, &key.as_bytes());
+        let key = hmac::Key::new(hmac::HMAC_SHA512, key.as_bytes());
         let hmac = hmac::sign(&key, &seed);
         ExtendedKey::new_private_key(
             Network::Mainnet,
