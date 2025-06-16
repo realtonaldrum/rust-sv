@@ -589,8 +589,8 @@ pub fn eval<T: Checker>(script: &[u8], checker: &mut T, flags: u32) -> Result<()
             OP_RIPEMD160 => {
                 check_stack_size(1, &stack)?;
                 let v = stack.pop().unwrap();
-                let mut ripemd160 = Ripemd160::new(); // Updated line
-                ripemd160.update(v.as_ref());
+                let mut ripemd160 = Ripemd160::new();
+                ripemd160.update(v.as_ref::<[u8]>());
                 let result = ripemd160.finalize().to_vec();
                 stack.push(result);
             }
