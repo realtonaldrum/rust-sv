@@ -2,7 +2,6 @@
 
 use crate::address::{addr_decode, AddressType};
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
-use crate::network::NetworkConfig; // Keep
 use crate::script::{next_op, op_codes, Script};
 use crate::util::{sha256d, var_int, Error, Hash256, Result, Serializable};
 use byteorder::{LittleEndian, WriteBytesExt};
