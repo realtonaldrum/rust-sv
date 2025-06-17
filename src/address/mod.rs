@@ -30,7 +30,7 @@
 
 use crate::network::NetworkConfig;
 use crate::util::{sha256d, Error, Hash160, Result};
-use bs58;
+use base58;
 
 /// Address type, either P2PKH or P2SH.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
