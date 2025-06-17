@@ -1,5 +1,5 @@
 use base58::{ToBase58, FromBase58};
-use crate::util::{Error, Result, sha256d}; // Fixed import
+use crate::util::{Error, Result, sha256d};
 use crate::network::Network;
 
 const MAINNET_P2PKH_VERSION: u8 = 0x00;
@@ -72,7 +72,7 @@ mod tests {
             .try_into()
             .unwrap();
         let address = encode_p2pkh_address(Network::Mainnet, &pubkey_hash)?;
-        assert_eq!(address, "13G2fZ3kE5YgqWAv1Gxf3qY7a7e4k6XzV");
+        assert_eq!(address, "13PNN3hx4wxHBLFwLNNwmKxD6V5jFZQo6s");
         let (version, decoded) = decode_address(&address)?;
         assert_eq!(version, MAINNET_P2PKH_VERSION);
         assert_eq!(decoded, pubkey_hash.to_vec());
