@@ -1,6 +1,8 @@
 //! Transaction sighash helpers
 
+use crate::address::addr_decode;
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
+use crate::network::NetworkConfig;
 use crate::script::{next_op, op_codes, Script};
 use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -252,25 +254,22 @@ fn legacy_sighash(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::address::addr_decode;
     use crate::messages::{OutPoint, TxIn};
     use crate::transaction::p2pkh;
-    use hex;
+    use hex::decode as hex_decode;
 
     #[test]
     fn bip143_sighash_test() -> Result<()> {
-        let lock_script =
-            hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac").unwrap();
-        let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
-        let hash160 = addr_decode(addr, NetworkConfig::new(1)?).unwrap().0;
+        let lock_script = hex_decode!("76a91402b748ebb047606b4b3fbdfb1a6e8e053cbdb8a588ac")?;
+        let addr = "mfmKD4cP6Na7T8D87XRSi7shA1HNGSaec";
+        let hash160 = addr_decode::decode_addr(addr, NetworkConfig::new(1)?)?.unwrap().0;
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
                 prev_output: OutPoint {
                     hash: Hash256::decode(
-                        "f671dc000ad12795e86b59b27e0c367d9b026bbd4141c227b9285867a53bb6f7",
-                    )
-                    .unwrap(),
+                        "f671dc000ad12795e69759beb70e367d9b026bbd4141c227b9285867a53bb6f7",
+                    )?,
                     index: 0,
                 },
                 unlock_script: Script(vec![]),
@@ -279,21 +278,20 @@ mod tests {
             outputs: vec![
                 TxOut {
                     satoshis: 100,
-                    lock_script: p2pkh::create_lock_script(&hash160),
+                    lock_script: p2pkh::create_lock(&hash160),
                 },
                 TxOut {
                     satoshis: 259899900,
-                    lock_script: p2pkh::create_lock_script(&hash160),
+                    lock_script: p2pkh::create_lock(&hash160),
                 },
             ],
             lock_time: 0,
         };
         let mut cache = SigHashCache::new();
         let sighash_type = SIGHASH_ALL | SIGHASH_FORKID;
-        let sighash =
-            bip143_sighash(&tx, 0, &lock_script, 260000000, sighash_type, &mut cache).unwrap();
+        let sighash = bip143_sighash(&tx, 0, &lock_script, 260000000, sighash_type, &mut cache)?;
         let expected = "1e2121837829018daf3aeadab76f1a542c49a3600ded7bd74323ee74ce0d840c";
-        assert!(sighash.0.to_vec() == hex::decode(expected).unwrap());
+        assert_eq!(sighash.to_vec(), hex_decode(expected)?);
         assert!(cache.hash_prevouts.is_some());
         assert!(cache.hash_sequence.is_some());
         assert!(cache.hash_outputs.is_some());
@@ -301,17 +299,15 @@ mod tests {
     }
 
     #[test]
-    fn legacy_sighash_test() {
-        let lock_script =
-            hex::decode("76a914d951eb562f1ff26b6cbe89f04eda365ea6bd95ce88ac").unwrap();
+    fn legacy_sighash_test() -> Result<()> {
+        let lock_script = hex_decode!("76a914d951eb562f1ff26b6cbeff04eda365ea6bd95ce88ac")?;
         let tx = Tx {
             version: 1,
             inputs: vec![TxIn {
                 prev_output: OutPoint {
                     hash: Hash256::decode(
-                        "bf6c1139ea01ca054b8d00aa0a088daaeab4f3b8e111626c6be7d603a9dd8dff",
-                    )
-                    .unwrap(),
+                        "bf6c1139ea01ef054b8e00a0aa088deaeab4e3b8e111d26c6937d603a9dd88ff",
+                    )?,
                     index: 0,
                 },
                 unlock_script: Script(vec![]),
@@ -319,14 +315,13 @@ mod tests {
             }],
             outputs: vec![TxOut {
                 satoshis: 49990000,
-                lock_script: Script(
-                    hex::decode("76a9147865b0b301119fc3eadc7f3406ff1339908e46d488ac").unwrap(),
-                ),
+                lock_script: Script(hex_decode!("76a9147865b0b337119ac3e4dc7f3403ff13999081e6d488ac")?.into()),
             }],
             lock_time: 0,
         };
-        let sighash = legacy_sighash(&tx, 0, &lock_script, SIGHASH_ALL).unwrap();
-        let expected = "ad16084eccf26464a84c5ee2f8b96b4daff9a3154ac3c1b320346aed042abe57";
-        assert!(sighash.0.to_vec() == hex::decode(expected).unwrap());
+        let sighash = legacy_sighash(&tx, 0, &lock_script, SIGHASH_ALL)?;
+        let expected = "ad16084eccf26464aaf4c5e2f58b96b4d9f90a3154ac3c1b3203b7ed042abe57";
+        assert_eq!(sighash.to_vec(), hex_decode(expected)?);
+        Ok(())
     }
 }
