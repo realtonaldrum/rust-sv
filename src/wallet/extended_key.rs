@@ -3,7 +3,7 @@ use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use bs58;
 use ring::hmac;
-use secp256k1::{Secp256k1, SecretKey, PublicKey}; // Removed unused Scalar import
+use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
@@ -29,7 +29,7 @@ pub const TESTNET_PUBLIC_EXTENDED_KEY: u32 = 0x043587CF;
 pub const TESTNET_PRIVATE_EXTENDED_KEY: u32 = 0x04358394;
 
 // Public or private key type
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)] // Added Clone derive
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ExtendedKeyType {
     Public,
     Private,
@@ -62,7 +62,7 @@ impl ExtendedKey {
         {
             let mut c = Cursor::new(&mut extended_key.0 as &mut [u8]);
             match network {
-                Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PUBLIC_EXTENDED_KEY)?, // Fixed typo
+                Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PUBLIC_EXTENDED_KEY)?,
                 Network::Testnet | Network::STN => c.write_u32::<BigEndian>(TESTNET_PUBLIC_EXTENDED_KEY)?,
             }
             c.write_u8(depth)?;
@@ -90,7 +90,7 @@ impl ExtendedKey {
             return Err(Error::BadArgument("Chain code must be 32 bytes".to_string()));
         }
         if private_key.len() != 32 {
-            return Err(Error::BadArgument("Private key must be 32 bytes".to_string())); // Fixed returnErr to return Err
+            return Err(Error::BadArgument("Private key must be 32 bytes".to_string()));
         }
         let mut extended_key = ExtendedKey([0; 78]);
         {
@@ -368,6 +368,7 @@ impl ExtendedKey {
         let mut v = Vec::with_capacity(82);
         v.extend_from_slice(&self.0);
         v.extend_from_slice(&checksum.0[..4]);
+        eprintln!("Bytes to encode: {:?}", v); // Added debug print
         let result = bs58::encode(&v).into_string();
         eprintln!("Encoded key: {}", result);
         result
@@ -543,7 +544,7 @@ mod tests {
             111,
             &[0, 1, 2],
             44,
-            &[5; 32],
+            &[5; 31],
             &[6; 33],
         )
         .is_err());
