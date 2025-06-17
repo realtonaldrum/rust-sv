@@ -9,7 +9,7 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-bs58 = "0.5.1"
+base58 = "0.2"  # Replaced bs58
 byteorder = "1.5.0"
 digest = "0.10.7"
 dns-lookup = "2.0.4"
