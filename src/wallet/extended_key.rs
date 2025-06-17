@@ -260,7 +260,7 @@ impl ExtendedKey {
 
         // Debug prints
         eprintln!("Tweak: {:?}", tweak);
-        eprintln!("Parent private key: {:?}", private_key[..]);
+        eprintln!("Parent private key: {:?}", private_key.secret_bytes());
 
         // Compute child private key: parent_private_key + tweak (mod n)
         let mut tweak_array = [0u8; 32];
@@ -273,7 +273,7 @@ impl ExtendedKey {
             .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
 
         // Debug print
-        eprintln!("Child private key: {:?}", child_private_key[..]);
+        eprintln!("Child private key: {:?}", child_private_key.secret_bytes());
         eprintln!("Child chain code: {:?}", child_chain_code);
 
         let fingerprint = self.fingerprint()?;
