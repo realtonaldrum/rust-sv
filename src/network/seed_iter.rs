@@ -1,54 +1,24 @@
 #![allow(deprecated)]
 
-//! Iterates over Bitcoin SV DNS seeds to resolve IP addresses semi-randomly.
-//!
-//! The `SeedIter` struct provides an iterator over IP addresses resolved from a list
-//! of DNS seeds, useful for establishing P2P connections to Bitcoin SV nodes.
-//!
-//! # Example
-//!
-//! ```rust
-//! use sv::network::SeedIter;
-//!
-//! let seeds = vec!["seed.bitcoinsv.io".to_string(), "seed.satoshisvision.network".to_string()];
-//! let mut iter = SeedIter::new(&seeds, 8333);
-//! while let Some((ip, port)) = iter.next() {
-//!     println!("Resolved: {}:{}", ip, port);
-//! }
-//! ```
-
 use dns_lookup::lookup_host;
 use log::{error, info};
-use rand::thread_rng; // Removed Rng
+use rand::{thread_rng, Rng}; // Added Rng
 use std::net::IpAddr;
 
-/// Iterates through DNS seeds semi-randomly to resolve Bitcoin SV node addresses.
 #[derive(Clone, Debug)]
 pub struct SeedIter<'a> {
-    /// Common port for all resolved IP addresses (e.g., 8333 for mainnet).
     pub port: u16,
-    /// List of DNS seeds to resolve.
     seeds: &'a [String],
-    /// Resolved IP addresses from the current seed.
     nodes: Vec<IpAddr>,
-    /// Current index into the seeds list.
     seed_index: usize,
-    /// Current index into the nodes list.
     node_index: usize,
-    /// Random offset for semi-random iteration.
     random_offset: usize,
 }
 
 impl<'a> SeedIter<'a> {
-    /// Creates a new iterator over DNS seeds with a random starting offset.
-    ///
-    /// # Arguments
-    ///
-    /// * `seeds` - Slice of DNS seed hostnames (e.g., ["seed.bitcoinsv.io"]).
-    /// * `port` - Port to pair with resolved IPs (e.g., 8333 for mainnet).
     pub fn new(seeds: &'a [String], port: u16) -> Self {
         let mut rng = thread_rng();
-        let random_offset = rng.gen_range(0..100); // Changed to gen_range
+        let random_offset = rng.gen_range(0..100); // Already fixed
         Self {
             port,
             seeds,
@@ -63,15 +33,11 @@ impl<'a> SeedIter<'a> {
 impl<'a> Iterator for SeedIter<'a> {
     type Item = (IpAddr, u16);
 
-    /// Returns the next resolved IP address and port, or None if exhausted.
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            // Check if all seeds are exhausted
             if self.seed_index >= self.seeds.len() {
                 return None;
             }
-
-            // Resolve new nodes if the current list is empty
             if self.nodes.is_empty() {
                 let i = (self.seed_index + self.random_offset) % self.seeds.len();
                 info!("Looking up DNS: {}", self.seeds[i]);
@@ -91,8 +57,6 @@ impl<'a> Iterator for SeedIter<'a> {
                     }
                 }
             }
-
-            // Return the next node, or reset for the next seed
             let i = (self.node_index + self.random_offset) % self.nodes.len();
             self.node_index += 1;
             if self.node_index >= self.nodes.len() {
@@ -120,7 +84,6 @@ mod tests {
     fn test_seed_iter_invalid_seed() {
         let seeds = vec!["invalid.dns.seed".to_string()];
         let mut iter = SeedIter::new(&seeds, 8333);
-        // Should skip invalid seed and return None
         assert_eq!(iter.next(), None);
     }
 
@@ -129,7 +92,6 @@ mod tests {
         let seeds = vec!["seed.bitcoinsv.io".to_string()];
         let iter1 = SeedIter::new(&seeds, 8333);
         let iter2 = SeedIter::new(&seeds, 8333);
-        // Random offsets should differ with high probability
         assert_ne!(iter1.random_offset, iter2.random_offset);
     }
 }
