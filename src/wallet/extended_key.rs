@@ -289,7 +289,12 @@ impl ExtendedKey {
         eprintln!("Child private key: {:?}", child_private_key.secret_bytes());
         eprintln!("Child chain code: {:?}", child_chain_code);
 
+        // Compute fingerprint
+        let parent_public_key = PublicKey::from_secret_key(&secp, &private_key).serialize();
+        eprintln!("Parent public key: {:?}", parent_public_key);
         let fingerprint = self.fingerprint()?;
+        eprintln!("Parent fingerprint: {:?}", fingerprint);
+
         ExtendedKey::new_private_key(
             network,
             self.depth() + 1,
