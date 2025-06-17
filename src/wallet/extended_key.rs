@@ -98,8 +98,6 @@ impl ExtendedKey {
     pub fn derive_child(&self, index: u32, secp: &Secp256k1<secp256k1::All>) -> Result<ExtendedKey> {
         let is_private = self.is_private();
         let is_hardened = index >= HARDENED_KEY;
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&self.chain_code())
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
 
         // Prepare HMAC input
         let mut hmac_input = Vec::new();
@@ -116,11 +114,16 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        hmac.update(&hmac_input);
         eprintln!("Parent chain code: {}", hex::encode(self.chain_code()));
         eprintln!("HMAC input: {}", hex::encode(&hmac_input));
 
+        // Compute HMAC
+        let chain_code = self.chain_code();
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
+            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
+        hmac.update(&hmac_input);
         let result = hmac.finalize().into_bytes();
+        eprintln!("Raw HMAC result: {}", hex::encode(&result));
         if result.len() != 64 {
             return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
         }
@@ -196,7 +199,7 @@ pub fn derive_extended_key(
     secp: &Secp256k1<secp256k1::All>,
 ) -> Result<ExtendedKey> {
     if path.is_empty() || path == "m" {
-        let seed = hex::decode(input).map_err(|e| Error::FromHexError(e))?;
+        let seed = hex::decode(input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
         return extended_key_from_seed(&seed, network);
     }
 
@@ -207,7 +210,7 @@ pub fn derive_extended_key(
         let index_str = part.trim_end_matches(|c| c == 'H' || c == '\'');
         let index: u32 = index_str
             .parse()
-            .map_err(|e| Error::ParseIntError(e))?;
+            .map_err(|_| Error::BadData("Invalid derivation index".to_string()))?;
         let index = if is_hardened { index + HARDENED_KEY } else { index };
         key = key.derive_child(index, secp)?;
     }
