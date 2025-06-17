@@ -1,4 +1,4 @@
-//! Transaction sighash helpers
+// ! Transaction sighash helpers
 
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
 use crate::script::{next_op, op_codes, Script};
@@ -252,9 +252,8 @@ fn legacy_sighash(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::address::addr_decode;
+    use crate::address::decode_address; // Fixed import
     use crate::messages::{OutPoint, TxIn};
-    use crate::network::NetworkConfig;
     use crate::transaction::p2pkh;
     use hex;
 
@@ -262,7 +261,7 @@ mod tests {
     fn bip143_sighash_test() -> Result<()> {
         let lock_script = hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac")?;
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
-        let (hash160, _addr_type) = addr_decode(addr, NetworkConfig::new(1)?)?;
+        let (_version, hash160) = decode_address(addr)?; // Fixed to use decode_address
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
