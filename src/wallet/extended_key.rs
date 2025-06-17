@@ -71,17 +71,11 @@ impl ExtendedKey {
 
     /// Encodes an extended key into a base58 string
     pub fn encode(&self) -> String {
-        let version = self.version();
-        eprintln!("Version bytes: {:?}", version);
         let checksum = sha256d(&self.0);
-        eprintln!("Checksum: {:?}", &checksum.0[..4]);
         let mut v = Vec::with_capacity(82);
         v.extend_from_slice(&self.0);
         v.extend_from_slice(&checksum.0[..4]);
-        eprintln!("Bytes to encode: {:?}", v);
-        let result = v.to_base58();
-        eprintln!("Encoded key: {}", result);
-        result
+        v.to_base58()
     }
 
     /// Decodes an extended key from a base58 string
@@ -105,9 +99,10 @@ impl ExtendedKey {
         let is_hardened = index >= HARDENED_KEY;
         let mut hmac = hmac::Context::with_key(&hmac::Key::new(hmac::HMAC_SHA512, &self.chain_code()));
 
+        // Prepare HMAC input
         if is_private && is_hardened {
             hmac.update(&[0]);
-            hmac.update(&self.key()[1..33]);
+            hmac.update(&self.key()[1..33]); // Private key without prefix
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
             hmac.update(&pubkey.serialize());
@@ -115,17 +110,20 @@ impl ExtendedKey {
             if is_hardened {
                 return Err(Error::InvalidOperation("Hardened derivation not supported for public keys".to_string()));
             }
-            hmac.update(&self.key());
+            hmac.update(&self.key()); // Public key
         }
 
-        let index_bytes = index.to_be_bytes();
-        hmac.update(&index_bytes);
+        hmac.update(&index.to_be_bytes());
         let result = hmac.sign();
+        let il = &result.as_ref()[0..32]; // Left part for key tweak
+        let chain_code = &result.as_ref()[32..64]; // Right part for chain code
 
         let mut child_key = ExtendedKey([0; 78]);
+        // Set version bytes (same as parent for private keys)
         child_key.0[0..4].copy_from_slice(&self.version());
+        // Increment depth
         child_key.0[4] = self.depth().wrapping_add(1);
-        // Compute parent fingerprint from compressed public key
+        // Compute parent fingerprint
         let parent_pubkey = if is_private {
             PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?)
         } else {
@@ -133,17 +131,21 @@ impl ExtendedKey {
         };
         let parent_fingerprint = sha256d(&parent_pubkey.serialize()).0[..4].to_vec();
         child_key.0[5..9].copy_from_slice(&parent_fingerprint);
-        child_key.0[9..13].copy_from_slice(&index_bytes);
-        child_key.0[13..45].copy_from_slice(&result.as_ref()[32..64]);
+        // Set child index
+        child_key.0[9..13].copy_from_slice(&index.to_be_bytes());
+        // Set chain code
+        child_key.0[13..45].copy_from_slice(chain_code);
 
+        // Compute child key
         if is_private {
-            let mut child_secret = SecretKey::from_slice(&result.as_ref()[0..32])?;
-            child_secret = child_secret.add_tweak(&SecretKey::from_slice(&self.key()[1..33])?.into())?;
-            child_key.0[45] = 0;
+            let parent_secret = SecretKey::from_slice(&self.key()[1..33])?;
+            let tweak = SecretKey::from_slice(il)?;
+            let child_secret = parent_secret.add_tweak(&tweak.into())?;
+            child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
-            let tweak = SecretKey::from_slice(&result.as_ref()[0..32])?;
+            let tweak = SecretKey::from_slice(il)?;
             let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into())?;
             child_key.0[45..78].copy_from_slice(&child_pubkey.serialize());
         }
@@ -245,8 +247,6 @@ mod tests {
         let secp = Secp256k1::new();
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
-        eprintln!("Child key bytes: {:?}", child.0);
-        eprintln!("Actual tprv for m/0H: {}", encoded);
         assert_eq!(
             encoded,
             "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
