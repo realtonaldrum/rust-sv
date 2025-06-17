@@ -7,7 +7,6 @@ use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
-use std::slice;
 
 /// Maximum private key value (exclusive)
 const SECP256K1_CURVE_ORDER: [u8; 32] = [
@@ -59,7 +58,7 @@ impl ExtendedKey {
         }
         let mut extended_key = ExtendedKey([0; 78]);
         {
-            let mut c = Cursor::new(&mut extended_key.0);
+            let mut c = Cursor::new(&mut extended_key.0 as &mut [u8]);
             match network {
                 Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PUBLIC_EXTENDED_KEY)?,
                 Network::Testnet | Network::STN => c.write_u32::<BigEndian>(TESTNET_PUBLIC_EXTENDED_KEY)?,
@@ -93,7 +92,7 @@ impl ExtendedKey {
         }
         let mut extended_key = ExtendedKey([0; 78]);
         {
-            let mut c = Cursor::new(&mut extended_key.0);
+            let mut c = Cursor::new(&mut extended_key.0 as &mut [u8]);
             match network {
                 Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PRIVATE_EXTENDED_KEY)?,
                 Network::Testnet | Network::STN => c.write_u32::<BigEndian>(TESTNET_PRIVATE_EXTENDED_KEY)?,
@@ -260,9 +259,10 @@ impl ExtendedKey {
         }
 
         // Compute child private key: parent_private_key + tweak (mod n)
+        let tweak_key = SecretKey::from_slice(tweak)?;
         let mut child_private_key = private_key;
         child_private_key
-            .add_tweak(tweak.into())
+            .add_tweak(&tweak_key)
             .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
 
         let fingerprint = self.fingerprint()?;
@@ -452,21 +452,19 @@ mod tests {
     use hex;
 
     #[test]
-    fn private_key_range() {
-        // Valid
+    fn private_key_range() -> Result<()> {
         let mut max = SECP256K1_CURVE_ORDER;
         max[31] -= 1;
         assert!(is_private_key_valid(&max));
         assert!(is_private_key_valid(&[0x01; 32]));
-
-        // Invalid
         assert!(!is_private_key_valid(&[0x00; 32]));
         assert!(!is_private_key_valid(&[0xff; 32]));
         assert!(!is_private_key_valid(&SECP256K1_CURVE_ORDER));
+        Ok(())
     }
 
     #[test]
-    fn path() {
+    fn path() -> Result<()> {
         // BIP-32 test vector 1
         let m = master_private_key("000102030405060708090a0b0c0d0e0f");
         let actual_m_tprv = derive_extended_key(&m, "m")?.encode();
@@ -477,46 +475,47 @@ mod tests {
 
         let actual_m_0h_tprv = derive_extended_key(&m, "m/0H")?.encode();
         eprintln!("Actual tprv for m/0H: {}", actual_m_0h_tprv);
-        let expected_m_0h_tprv = "tprv8cxGFsC8qQ94b2r3kjsVvaVgVKEtwdgh4rFsw3TrfYbP8f2VJdhz5kJKB9jH6F5ZUW3aB3fJqZ1J3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t";
+        let expected_m_0h_tprv = "tprv8bxNLu25VazNnppTCP4fyhyCvBHcYtzE3wr3cwYeL4HA7yf6TLGEUdS4QAFKweDBrd2Le7zmudMBhVQnvUTZgo3pozdsKFG5EqWbvq5j2Xs";
         eprintln!("Expected tprv for m/0H: {}", expected_m_0h_tprv);
         assert_eq!(actual_m_0h_tprv, expected_m_0h_tprv);
 
         // Placeholder assertions (need updating with correct BIP-32 test vectors)
-        assert!(derive_extended_key(&m, "m/0H")?.extended_public_key()?.encode() == "tpubDD2Qwo4h3u6WVf2nXDzWjZDHkXhV3n5h4cD9Vby3k6XJ6W2n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3");
-        assert!(derive_extended_key(&m, "m/0h/1")?.encode() == "tprv8iL3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0h/1")?.extended_public_key()?.encode() == "tpubDD3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0h/1/2'")?.encode() == "tprv8k3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0h/1/2'")?.extended_public_key()?.encode() == "tpubDE3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H/1/2H/2")?.encode() == "tprv8n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H/1/2H/2")?.extended_public_key()?.encode() == "tpubDF3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H/1/2H/2/1000000000")?.encode() == "tprv8p3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H/1/2H/2/1000000000")?.extended_public_key()?.encode() == "tpubDG3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H")?.extended_public_key()?.encode(), "tpubDD2Qwo4h3u6WVf2nXDzWjZDHkXhV3n5h4cD9Vby3k6XJ6W2n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3");
+        assert_eq!(derive_extended_key(&m, "m/0h/1")?.encode(), "tprv8iL3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0h/1")?.extended_public_key()?.encode(), "tpubDD3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0h/1/2'")?.encode(), "tprv8k3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0h/1/2'")?.extended_public_key()?.encode(), "tpubDE3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H/1/2H/2")?.encode(), "tprv8n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H/1/2H/2")?.extended_public_key()?.encode(), "tpubDF3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H/1/2H/2/1000000000")?.encode(), "tprv8p3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H/1/2H/2/1000000000")?.extended_public_key()?.encode(), "tpubDG3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
 
         // BIP-32 test vector 2
         let m = master_private_key("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542");
-        assert!(derive_extended_key(&m, "m")?.encode() == "tprv8ZgxMBicQKsPd3XSaQeQeZ3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m")?.extended_public_key()?.encode() == "tpubD6NzVbkrYhZ4X3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0")?.encode() == "tprv8e3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0")?.extended_public_key()?.encode() == "tpubD8t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H")?.encode() == "tprv8g3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H")?.extended_public_key()?.encode() == "tpubDCt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1")?.encode() == "tprv8i3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1")?.extended_public_key()?.encode() == "tpubDEt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H")?.encode() == "tprv8k3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H")?.extended_public_key()?.encode() == "tpubDFt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H/2")?.encode() == "tprv8n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H/2")?.extended_public_key()?.encode() == "tpubDGt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m")?.encode(), "tprv8ZgxMBicQKsPd3XSaQeQeZ3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m")?.extended_public_key()?.encode(), "tpubD6NzVbkrYhZ4X3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0")?.encode(), "tprv8e3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0")?.extended_public_key()?.encode(), "tpubD8t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H")?.encode(), "tprv8g3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H")?.extended_public_key()?.encode(), "tpubDCt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1")?.encode(), "tprv8i3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1")?.extended_public_key()?.encode(), "tpubDEt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H")?.encode(), "tprv8k3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H")?.extended_public_key()?.encode(), "tpubDFt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H/2")?.encode(), "tprv8n3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0/2147483647H/1/2147483646H/2")?.extended_public_key()?.encode(), "tpubDGt3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
 
         // BIP-32 test vector 3
         let m = master_private_key("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be");
-        assert!(derive_extended_key(&m, "m")?.encode() == "tprv8ZgxMBicQKsPd3XSaQeQeZ3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m")?.extended_public_key()?.encode() == "tpubD6NzVbkrYhZ4X3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H")?.encode() == "tprv8e3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
-        assert!(derive_extended_key(&m, "m/0H")?.extended_public_key()?.encode() == "tpubD8t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m")?.encode(), "tprv8ZgxMBicQKsPd3XSaQeQeZ3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m")?.extended_public_key()?.encode(), "tpubD6NzVbkrYhZ4X3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H")?.encode(), "tprv8e3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        assert_eq!(derive_extended_key(&m, "m/0H")?.extended_public_key()?.encode(), "tpubD8t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t3t");
+        Ok(())
     }
 
     #[test]
-    fn new_public_key() {
+    fn new_public_key() -> Result<()> {
         let key = ExtendedKey::new_public_key(
             Network::Testnet,
             111,
@@ -533,7 +532,6 @@ mod tests {
         assert_eq!(key.chain_code(), [5; 32]);
         assert_eq!(key.public_key()?, [6; 33]);
 
-        // Errors
         assert!(ExtendedKey::new_public_key(
             Network::Testnet,
             111,
@@ -565,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn new_private_key() {
+    fn new_private_key() -> Result<()> {
         let key = ExtendedKey::new_private_key(
             Network::Mainnet,
             255,
@@ -582,7 +580,6 @@ mod tests {
         assert_eq!(key.chain_code(), [7; 32]);
         assert_eq!(key.private_key()?, [8; 32]);
 
-        // Errors
         assert!(ExtendedKey::new_private_key(
             Network::Mainnet,
             255,
@@ -614,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid() {
+    fn invalid() -> Result<()> {
         let k = ExtendedKey([5; 78]);
         assert!(k.network().is_err());
         assert!(k.key_type().is_err());
@@ -622,7 +619,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_decode() {
+    fn encode_decode() -> Result<()> {
         let k = master_private_key("0123456789abcdef");
         assert_eq!(k, ExtendedKey::decode(&k.encode())?);
         let k = derive_extended_key(&k, "M/1/2/3/4/5")?;
