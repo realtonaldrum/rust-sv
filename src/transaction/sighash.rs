@@ -2,7 +2,7 @@
 
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
 use crate::script::{next_op, op_codes, Script};
-use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d, hash160::Hash160};
+use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d};
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::Write;
 
@@ -263,7 +263,6 @@ mod tests {
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
         let (_version, hash160_vec) = decode_address(addr)?;
         let hash160_array: [u8; 20] = hash160_vec.try_into().map_err(|_| Error::BadData("Invalid hash160 length".to_string()))?;
-        let hash160 = Hash160(hash160_array); // Construct Hash160
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
@@ -279,11 +278,11 @@ mod tests {
             outputs: vec![
                 TxOut {
                     satoshis: 100,
-                    lock_script: p2pkh::create_lock_script(&hash160),
+                    lock_script: p2pkh::create_lock_script(&hash160_array.into()),
                 },
                 TxOut {
                     satoshis: 259899900,
-                    lock_script: p2pkh::create_lock_script(&hash160),
+                    lock_script: p2pkh::create_lock_script(&hash160_array.into()),
                 },
             ],
             lock_time: 0,
