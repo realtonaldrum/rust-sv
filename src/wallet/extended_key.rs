@@ -205,7 +205,7 @@ fn hmac_sha512(key: &[u8], data: &[u8]) -> [u8; 64] {
     ctx.update(&outer);
     ctx.update(inner_hash.as_ref());
     let final_hash = ctx.finish();
-    let mut result = [u8; 64];
+    let mut result = [0u8; 64];
     result.copy_from_slice(final_hash.as_ref());
     result
 }
