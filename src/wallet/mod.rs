@@ -1,10 +1,14 @@
-//! Wallet and key management
-
-mod extended_key;
-mod mnemonic;
+pub mod address;
+pub mod extended_key;
 
 pub use self::extended_key::{
-    derive_extended_key, ExtendedKey, ExtendedKeyType, HARDENED_KEY, MAINNET_PRIVATE_EXTENDED_KEY,
-    MAINNET_PUBLIC_EXTENDED_KEY, TESTNET_PRIVATE_EXTENDED_KEY, TESTNET_PUBLIC_EXTENDED_KEY,
+    ExtendedKey,
+    ExtendedKeyType,
+    HARDENED_KEY,
+    MAINNET_PRIVATE_EXTENDED_KEY,
+    MAINNET_PUBLIC_EXTENDED_KEY,
+    TESTNET_PRIVATE_EXTENDED_KEY,
+    TESTNET_PUBLIC_EXTENDED_KEY,
+    derive_extended_key,
+    extended_key_from_seed,
 };
-pub use self::mnemonic::{load_wordlist, mnemonic_decode, mnemonic_encode, Wordlist};
