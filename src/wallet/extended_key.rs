@@ -1,8 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac::{Hmac, Mac};
-use sha2::Sha512;
+use ring::digest::{self, SHA512};
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{Read, Write};
 use std::fmt;
@@ -98,8 +97,6 @@ impl ExtendedKey {
     pub fn derive_child(&self, index: u32, secp: &Secp256k1<secp256k1::All>) -> Result<ExtendedKey> {
         let is_private = self.is_private();
         let is_hardened = index >= HARDENED_KEY;
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&self.chain_code())
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
 
         // Prepare HMAC input
         let mut hmac_input = Vec::new();
@@ -116,14 +113,10 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        hmac.update(&hmac_input);
         eprintln!("Parent chain code: {}", hex::encode(self.chain_code()));
         eprintln!("HMAC input: {}", hex::encode(&hmac_input));
 
-        let result = hmac.finalize().into_bytes();
-        if result.len() != 64 {
-            return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
-        }
+        let result = hmac_sha512(&self.chain_code(), &hmac_input);
         let il = &result[0..32]; // Left part for key tweak
         let chain_code = &result[32..64]; // Right part for chain code
         eprintln!("HMAC output il: {}", hex::encode(il));
@@ -188,6 +181,34 @@ impl fmt::Debug for ExtendedKey {
     }
 }
 
+/// Computes HMAC-SHA512 using ring::digest::SHA512
+fn hmac_sha512(key: &[u8], data: &[u8]) -> [u8; 64] {
+    let mut k = [0u8; 64];
+    if key.len() > 64 {
+        let hash = digest::digest(&SHA512, key);
+        k[..hash.as_ref().len()].copy_from_slice(hash.as_ref());
+    } else {
+        k[..key.len()].copy_from_slice(key);
+    }
+    let mut inner = [0x36u8; 64];
+    let mut outer = [0x5cu8; 64];
+    for i in 0..64 {
+        inner[i] ^= k[i];
+        outer[i] ^= k[i];
+    }
+    let mut ctx = digest::Context::new(&SHA512);
+    ctx.update(&inner);
+    ctx.update(data);
+    let inner_hash = ctx.finish();
+    let mut ctx = digest::Context::new(&SHA512);
+    ctx.update(&outer);
+    ctx.update(inner_hash.as_ref());
+    let final_hash = ctx.finish();
+    let mut result = [0u8; 64];
+    result.copy_from_slice(final_hash.as_ref());
+    result
+}
+
 /// Derives an extended key from a seed or parent key
 pub fn derive_extended_key(
     input: &str,
@@ -217,10 +238,7 @@ pub fn derive_extended_key(
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
     let _secp = Secp256k1::new();
-    let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
-        .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-    hmac.update(seed);
-    let result = hmac.finalize().into_bytes();
+    let result = hmac_sha512(b"Bitcoin seed", seed);
     if result.len() != 64 {
         return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
     }
