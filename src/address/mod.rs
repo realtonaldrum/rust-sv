@@ -1,7 +1,6 @@
 use base58::{ToBase58, FromBase58};
-use crate::util::{Error, hash160, sha256d};
+use crate::util::{Error, sha256d}; // Removed hash160, std::io
 use crate::network::Network;
-use std::io;
 
 // Version bytes for different address types and networks
 const MAINNET_P2PKH_VERSION: u8 = 0x00; // Bitcoin P2PKH addresses
@@ -10,7 +9,7 @@ const TESTNET_P2PKH_VERSION: u8 = 0x6F; // Testnet P2PKH addresses
 const TESTNET_P2SH_VERSION: u8 = 0xC4;  // Testnet P2SH addresses
 
 /// Encodes a payload into a Bitcoin address (P2PKH or P2SH)
-pub fn encode_address(network: Network, version: u8, payload: &[u8]) -> Result<String, Error> {
+pub fn encode_address(_network: Network, version: u8, payload: &[u8]) -> Result<String, Error> {
     if payload.len() != 20 {
         return Err(Error::BadArgument("Payload must be 20 bytes".to_string()));
     }
@@ -19,12 +18,12 @@ pub fn encode_address(network: Network, version: u8, payload: &[u8]) -> Result<S
     v.extend_from_slice(payload);
     let checksum = sha256d(&v);
     v.extend_from_slice(&checksum.0[..4]);
-    Ok(v.to_base58()) // Line 68: Replaced bs58::encode(&payload).into_string()
+    Ok(v.to_base58())
 }
 
 /// Decodes a Bitcoin address into its version byte and payload
 pub fn decode_address(input: &str) -> Result<(u8, Vec<u8>), Error> {
-    let bytes = input.from_base58().map_err(|e| Error::FromBase58(e))?; // Line 73: Replaced bs58::decode(input)
+    let bytes = input.from_base58().map_err(|e| Error::FromBase58Error(e))?; // Fixed FromBase58 to FromBase58Error
     if bytes.len() != 25 {
         return Err(Error::BadData("Invalid address length".to_string()));
     }
@@ -43,7 +42,7 @@ pub fn encode_p2pkh_address(network: Network, pubkey_hash: &[u8]) -> Result<Stri
         Network::Mainnet => MAINNET_P2PKH_VERSION,
         Network::Testnet | Network::STN => TESTNET_P2PKH_VERSION,
     };
-    encode_address(network, version, pubkey_hash) // Line 120: Replaced bs58::encode(&payload).into_string()
+    encode_address(network, version, pubkey_hash)
 }
 
 /// Encodes a script hash into a P2SH address
