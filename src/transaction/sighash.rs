@@ -1,8 +1,6 @@
 //! Transaction sighash helpers
 
-use crate::address::addr_decode;
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
-use crate::network::NetworkConfig;
 use crate::script::{next_op, op_codes, Script};
 use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d};
 use byteorder::{LittleEndian, WriteBytesExt};
