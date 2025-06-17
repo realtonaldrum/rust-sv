@@ -115,11 +115,16 @@ impl ExtendedKey {
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
         hmac.update(&hmac_input);
+        eprintln!("Parent chain code: {}", hex::encode(self.chain_code()));
         eprintln!("HMAC input: {}", hex::encode(&hmac_input));
 
         let result = hmac.sign();
-        let il = &result.as_ref()[0..32]; // Left part for key tweak
-        let chain_code = &result.as_ref()[32..64]; // Right part for chain code
+        let output = result.as_ref();
+        if output.len() != 64 {
+            return Err(Error::BadData("Invalid HMAC output length".to_string()));
+        }
+        let il = &output[0..32]; // Left part for key tweak
+        let chain_code = &output[32..64]; // Right part for chain code
         eprintln!("HMAC output il: {}", hex::encode(il));
         eprintln!("HMAC output chain_code: {}", hex::encode(chain_code));
 
@@ -148,6 +153,8 @@ impl ExtendedKey {
             let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
+            eprintln!("Parent private key: {}", hex::encode(&self.key()[1..33]));
+            eprintln!("Tweak: {}", hex::encode(il));
             eprintln!("Child private key: {}", hex::encode(&child_secret[..]));
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
@@ -212,9 +219,13 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
     let mut hmac = hmac::Context::with_key(&hmac::Key::new(hmac::HMAC_SHA512, b"Bitcoin seed"));
     hmac.update(seed);
     let result = hmac.sign();
+    let output = result.as_ref();
+    if output.len() != 64 {
+        return Err(Error::BadData("Invalid HMAC output length".to_string()));
+    }
 
-    let secret_key = SecretKey::from_slice(&result.as_ref()[0..32])?;
-    let chain_code = &result.as_ref()[32..64];
+    let secret_key = SecretKey::from_slice(&output[0..32])?;
+    let chain_code = &output[32..64];
 
     let mut key = ExtendedKey([0; 78]);
     let version = match network {
@@ -229,6 +240,8 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
     key.0[45] = 0;
     key.0[46..78].copy_from_slice(&secret_key[..]);
 
+    eprintln!("Master private key: {}", hex::encode(&secret_key[..]));
+    eprintln!("Master chain code: {}", hex::encode(chain_code));
     Ok(key)
 }
 
