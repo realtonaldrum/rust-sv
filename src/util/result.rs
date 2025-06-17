@@ -1,8 +1,7 @@
 use hex::FromHexError;
-use ring;
+use ring::error::Unspecified as RingUnspecifiedError;
 use base58::FromBase58Error as FromBase58Error;
 use secp256k1::Error as Secp256k1Error;
-use std;
 use std::io;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
@@ -27,11 +26,11 @@ pub enum Error {
     /// Standard library IO error
     IOError(io::Error),
     /// Error parsing an integer
-    ParseIntError(std::num::ParseIntError),
+    ParseIntError(ParseIntError),
     /// Error evaluating the script
     ScriptError(String),
     /// Error in the Secp256k1 library
-    Secp256k1Error(secp256k1::Error),
+    Secp256k1Error(Secp256k1Error),
     /// The operation timed out
     Timeout,
     /// An unknown error in the Ring library
@@ -45,7 +44,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::BadArgument(s) => f.write_str(&format!("Bad argument: {}", s)),
             Error::BadData(s) => f.write_str(&format!("Bad data: {}", s)),
-            Error::FromBase58Error(e) => f.write_str(&format!("Base58 decoding error: {}", e)),
+            Error::FromBase58Error(e) => f.write_str(&format!("Base58 decoding error: {:?}", e)), // Changed {} to {:?}
             Error::FromHexError(e) => f.write_str(&format!("Hex decoding error: {}", e)),
             Error::FromUtf8Error(e) => f.write_str(&format!("Utf8 parsing error: {}", e)),
             Error::IllegalState(s) => f.write_str(&format!("Illegal state: {}", s)),
@@ -56,33 +55,15 @@ impl std::fmt::Display for Error {
             Error::Secp256k1Error(e) => f.write_str(&format!("Secp256k1 error: {}", e)),
             Error::Timeout => f.write_str("Timeout"),
             Error::UnspecifiedRingError => f.write_str("Unspecified ring error"),
-            Error::Unsupported(s) => f.write_str(&format!("Unsuppored: {}", s)),
+            Error::Unsupported(s) => f.write_str(&format!("Unsupported: {}", s)),
         }
     }
 }
 
 impl std::error::Error for Error {
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::BadArgument(_) => "Bad argument",
-            Error::BadData(_) => "Bad data",
-            Error::FromBase58Error(_) => "Base58 decoding error",
-            Error::FromHexError(_) => "Hex decoding error",
-            Error::FromUtf8Error(_) => "Utf8 parsing error",
-            Error::IllegalState(_) => "Illegal state",
-            Error::InvalidOperation(_) => "Invalid operation",
-            Error::IOError(_) => "IO error",
-            Error::ParseIntError(_) => "Parse int error",
-            Error::ScriptError(_) => "Script error",
-            Error::Secp256k1Error(_) => "Secp256k1 error",
-            Error::Timeout => "Timeout",
-            Error::UnspecifiedRingError => "Unspecified ring error",
-            Error::Unsupported(_) => "Unsupported",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        match self {
+            Error::FromBase58Error(_) => None, // FromBase58Error does not implement Error
             Error::FromHexError(e) => Some(e),
             Error::FromUtf8Error(e) => Some(e),
             Error::IOError(e) => Some(e),
@@ -117,20 +98,20 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<std::num::ParseIntError> for Error {
-    fn from(e: std::num::ParseIntError) -> Self {
+impl From<ParseIntError> for Error {
+    fn from(e: ParseIntError) -> Self {
         Error::ParseIntError(e)
     }
 }
 
-impl From<secp256k1::Error> for Error {
-    fn from(e: secp256k1::Error) -> Self {
+impl From<Secp256k1Error> for Error {
+    fn from(e: Secp256k1Error) -> Self {
         Error::Secp256k1Error(e)
     }
 }
 
-impl From<ring::error::Unspecified> for Error {
-    fn from(_: ring::error::Unspecified) -> Self {
+impl From<RingUnspecifiedError> for Error {
+    fn from(_: RingUnspecifiedError) -> Self {
         Error::UnspecifiedRingError
     }
 }
