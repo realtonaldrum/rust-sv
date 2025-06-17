@@ -1,9 +1,10 @@
 use hex::FromHexError;
 use ring;
-use base58::Error as FromBase58Error;
-use secp256k1;
+use base58::FromBase58Error as FromBase58Error;
+use secp256k1::Error as Secp256k1Error;
 use std;
 use std::io;
+use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 
 /// Standard error type used in the library
