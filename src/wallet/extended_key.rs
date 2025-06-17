@@ -360,34 +360,33 @@ impl ExtendedKey {
     }
 
     /// Encodes an extended key into a string
-    pub fn encode(&self) -> String {
-        let version = self.version();
-        eprintln!("Version bytes: {:?}", version.to_be_bytes());
-        let checksum = sha256d(&self.0);
-        eprintln!("Checksum: {:?}", &checksum.0[..4]);
-        let mut v = Vec::with_capacity(82);
-        v.extend_from_slice(&self.0);
-        v.extend_from_slice(&checksum.0[..4]);
-        eprintln!("Bytes to encode: {:?}", v);
-        let result = base58::to_base58(&v); // Changed from bs58kit::encode(&v).into_string()
-        eprintln!("Encoded key: {}", result);
-        result
-    }
+pub fn encode(&self) -> String {
+    let version = self.version();
+    eprintln!("Version bytes: {:?}", version.to_be_bytes());
+    let checksum = sha256d(&self.0);
+    eprintln!("Checksum: {:?}", &checksum.0[..4]);
+    let mut v = Vec::with_capacity(82);
+    v.extend_from_slice(&self.0);
+    v.extend_from_slice(&checksum.0[..4]);
+    eprintln!("Bytes to encode: {:?}", v);
+    let result = base58::encode(&v); // Changed to base58::encode
+    eprintln!("Encoded key: {}", result);
+    result
+}
 
-    /// Decodes an extended key from a string
-    pub fn decode(s: &str) -> Result<ExtendedKey> {
-        let v = base58::from_base58(s).map_err(|_| Error::BadData("Invalid base58".to_string()))?; // Changed from bs58kit::decode(s).into_vec()
-        if v.len() != 82 {
-            return Err(Error::BadData("Invalid extended key length".to_string()));
-        }
-        let checksum = sha256d(&v[..78]);
-        if checksum.0[..4] != v[78..] {
-            return Err(Error::BadData("Invalid checksum".to_string()));
-        }
-        let mut extended_key = ExtendedKey([0; 78]);
-        extended_key.0.copy_from_slice(&v[..78]);
-        Ok(extended_key)
+/   // Decodes an extended key from a string
+pub fn decode(s: &str) -> Result<ExtendedKey> {
+    let v = base58::decode(s).map_err(|_| Error::BadData("Invalid base58".to_string()))?; // Changed to base58::decode
+    if v.len() != 82 {
+        return Err(Error::BadData("Invalid extended key length".to_string()));
     }
+    let checksum = sha256d(&v[..78]);
+    if checksum.0[..4] != v[78..] {
+        return Err(Error::BadData("Invalid checksum".to_string()));
+    }
+    let mut extended_key = ExtendedKey([0; 78]);
+    extended_key.0.copy_from_slice(&v[..78]);
+    Ok(extended_key)
 }
 
 impl Serializable<ExtendedKey> for ExtendedKey {
