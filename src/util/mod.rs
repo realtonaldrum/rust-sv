@@ -17,7 +17,8 @@ pub mod rx;
 mod serdes;
 pub(crate) mod var_int;
 
-pub(crate) use self::bits::{lshift, rshift, Bits};
+// Original: pub(crate) use self::bits::{lshift, rshift, Bits};
+pub(crate) use self::bits::{lshift, rshift};
 #[allow(dead_code)]
 pub use self::bloom_filter::{
     BloomFilter, BLOOM_FILTER_MAX_FILTER_SIZE, BLOOM_FILTER_MAX_HASH_FUNCS,
