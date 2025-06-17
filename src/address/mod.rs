@@ -1,14 +1,12 @@
 use base58::{ToBase58, FromBase58};
-use crate::util::{Error, sha256d}; // Removed hash160, std::io
+use crate::util::{Error, sha256d};
 use crate::network::Network;
 
-// Version bytes for different address types and networks
-const MAINNET_P2PKH_VERSION: u8 = 0x00; // Bitcoin P2PKH addresses
-const MAINNET_P2SH_VERSION: u8 = 0x05;  // Bitcoin P2SH addresses
-const TESTNET_P2PKH_VERSION: u8 = 0x6F; // Testnet P2PKH addresses
-const TESTNET_P2SH_VERSION: u8 = 0xC4;  // Testnet P2SH addresses
+const MAINNET_P2PKH_VERSION: u8 = 0x00;
+const MAINNET_P2SH_VERSION: u8 = 0x05;
+const TESTNET_P2PKH_VERSION: u8 = 0x6F;
+const TESTNET_P2SH_VERSION: u8 = 0xC4;
 
-/// Encodes a payload into a Bitcoin address (P2PKH or P2SH)
 pub fn encode_address(_network: Network, version: u8, payload: &[u8]) -> Result<String, Error> {
     if payload.len() != 20 {
         return Err(Error::BadArgument("Payload must be 20 bytes".to_string()));
@@ -21,9 +19,8 @@ pub fn encode_address(_network: Network, version: u8, payload: &[u8]) -> Result<
     Ok(v.to_base58())
 }
 
-/// Decodes a Bitcoin address into its version byte and payload
 pub fn decode_address(input: &str) -> Result<(u8, Vec<u8>), Error> {
-    let bytes = input.from_base58().map_err(|e| Error::FromBase58Error(e))?; // Fixed FromBase58 to FromBase58Error
+    let bytes = input.from_base58().map_err(|e| Error::FromBase58Error(e))?;
     if bytes.len() != 25 {
         return Err(Error::BadData("Invalid address length".to_string()));
     }
@@ -36,7 +33,6 @@ pub fn decode_address(input: &str) -> Result<(u8, Vec<u8>), Error> {
     Ok((version, payload))
 }
 
-/// Encodes a public key hash into a P2PKH address
 pub fn encode_p2pkh_address(network: Network, pubkey_hash: &[u8]) -> Result<String, Error> {
     let version = match network {
         Network::Mainnet => MAINNET_P2PKH_VERSION,
@@ -45,7 +41,6 @@ pub fn encode_p2pkh_address(network: Network, pubkey_hash: &[u8]) -> Result<Stri
     encode_address(network, version, pubkey_hash)
 }
 
-/// Encodes a script hash into a P2SH address
 pub fn encode_p2sh_address(network: Network, script_hash: &[u8]) -> Result<String, Error> {
     let version = match network {
         Network::Mainnet => MAINNET_P2SH_VERSION,
@@ -54,7 +49,6 @@ pub fn encode_p2sh_address(network: Network, script_hash: &[u8]) -> Result<Strin
     encode_address(network, version, script_hash)
 }
 
-/// Validates an address for a given network
 pub fn validate_address(network: Network, address: &str) -> Result<(), Error> {
     let (version, _) = decode_address(address)?;
     let expected_version = match network {
