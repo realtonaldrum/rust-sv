@@ -374,7 +374,7 @@ pub fn encode(&self) -> String {
     result
 }
 
-/   // Decodes an extended key from a string
+/// Decodes an extended key from a string
 pub fn decode(s: &str) -> Result<ExtendedKey> {
     let v = base58::decode(s).map_err(|_| Error::BadData("Invalid base58".to_string()))?; // Changed to base58::decode
     if v.len() != 82 {
