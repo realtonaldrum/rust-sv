@@ -259,10 +259,11 @@ impl ExtendedKey {
         }
 
         // Compute child private key: parent_private_key + tweak (mod n)
-        let tweak_key = SecretKey::from_slice(tweak)?;
+        let tweak_scalar = Scalar::from_be_bytes(tweak.into())
+            .map_err(|_| Error::BadData("Invalid tweak scalar".to_string()))?;
         let mut child_private_key = private_key;
         child_private_key
-            .add_tweak(&tweak_key)
+            .add_tweak(&tweak_scalar)
             .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
 
         let fingerprint = self.fingerprint()?;
