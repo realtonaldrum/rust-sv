@@ -254,6 +254,7 @@ fn legacy_sighash(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::address::AddressType;
     use crate::messages::{OutPoint, TxIn};
     use crate::transaction::p2pkh;
     use hex;
@@ -262,7 +263,7 @@ mod tests {
     fn bip143_sighash_test() -> Result<()> {
         let lock_script = hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac")?;
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
-        let hash160 = addr_decode(addr, NetworkConfig::new(1)?)?.unwrap().0;
+        let (hash160, _addr_type) = addr_decode(addr, NetworkConfig::new(1)?)?;
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
