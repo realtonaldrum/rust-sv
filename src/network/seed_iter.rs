@@ -19,7 +19,7 @@
 
 use dns_lookup::lookup_host;
 use log::{error, info};
-use rand::{thread_rng, Rng};
+use rand::thread_rng; // Removed Rng
 use std::net::IpAddr;
 
 /// Iterates through DNS seeds semi-randomly to resolve Bitcoin SV node addresses.
@@ -48,7 +48,7 @@ impl<'a> SeedIter<'a> {
     /// * `port` - Port to pair with resolved IPs (e.g., 8333 for mainnet).
     pub fn new(seeds: &'a [String], port: u16) -> Self {
         let mut rng = thread_rng();
-        let random_offset = rng.random_range(0..100);
+        let random_offset = rng.gen_range(0..100); // Changed to gen_range
         Self {
             port,
             seeds,
