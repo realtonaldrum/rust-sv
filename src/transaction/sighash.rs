@@ -2,7 +2,7 @@
 
 use crate::messages::{OutPoint, Payload, Tx, TxOut};
 use crate::script::{next_op, op_codes, Script};
-use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d};
+use crate::util::{var_int, Error, Hash256, Result, Serializable, sha256d, hash160::Hash160};
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::Write;
 
@@ -252,7 +252,7 @@ fn legacy_sighash(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::address::decode_address; // Fixed import
+    use crate::address::decode_address;
     use crate::messages::{OutPoint, TxIn};
     use crate::transaction::p2pkh;
     use hex;
@@ -261,7 +261,9 @@ mod tests {
     fn bip143_sighash_test() -> Result<()> {
         let lock_script = hex::decode("76a91402b74813b047606b4b3fbdfb1a6e8e053fdb8dab88ac")?;
         let addr = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec";
-        let (_version, hash160) = decode_address(addr)?; // Fixed to use decode_address
+        let (_version, hash160_vec) = decode_address(addr)?;
+        let hash160_array: [u8; 20] = hash160_vec.try_into().map_err(|_| Error::BadData("Invalid hash160 length".to_string()))?;
+        let hash160 = Hash160(hash160_array); // Construct Hash160
         let tx = Tx {
             version: 2,
             inputs: vec![TxIn {
