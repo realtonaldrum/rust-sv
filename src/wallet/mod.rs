@@ -1,5 +1,5 @@
-pub mod address;
 pub mod extended_key;
+pub use crate::address;
 
 pub use self::extended_key::{
     ExtendedKey,
