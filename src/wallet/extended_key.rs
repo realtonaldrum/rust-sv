@@ -3,7 +3,7 @@ use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use bs58;
 use ring::hmac;
-use secp256k1::{Secp256k1, SecretKey, PublicKey};
+use secp256k1::{Secp256k1, SecretKey, PublicKey, Scalar};
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
