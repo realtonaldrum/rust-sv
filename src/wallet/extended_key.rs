@@ -1,7 +1,7 @@
 use crate::network::Network;
 use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
-use base58;
+use base58::{ToBase58, FromBase58}; // Import traits
 use ring::hmac;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::fmt;
@@ -369,14 +369,14 @@ impl ExtendedKey {
         v.extend_from_slice(&self.0);
         v.extend_from_slice(&checksum.0[..4]);
         eprintln!("Bytes to encode: {:?}", v);
-        let result = base58::encode(&v);
+        let result = v.to_base58();
         eprintln!("Encoded key: {}", result);
         result
     }
 
     // Decodes an extended key from a string
     pub fn decode(s: &str) -> Result<ExtendedKey> {
-        let v = base58::decode(s).map_err(|_| Error::BadData("Invalid base58".to_string()))?;
+        let v = <Vec<u8>>::from_base58(s).map_err(|_| Error::BadData("Invalid base58".to_string()))?;
         if v.len() != 82 {
             return Err(Error::BadData("Invalid extended key length".to_string()));
         }
