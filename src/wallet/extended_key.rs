@@ -8,7 +8,7 @@ use std::fmt;
 
 // Version bytes for extended keys
 pub const MAINNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xAD, 0xE4]; // xprv
-pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E];  // xpub
+pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E]; // xpub
 pub const TESTNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x83, 0x94]; // tprv
 pub const TESTNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x87, 0xCF]; // tpub
 pub const HARDENED_KEY: u32 = 0x80000000;
@@ -27,7 +27,7 @@ pub struct ExtendedKey(pub [u8; 78]);
 impl ExtendedKey {
     /// Returns the version bytes
     pub fn version(&self) -> [u8; 4] {
-        let mut version = [u8; 4];
+        let mut version = [0u8; 4];
         version.copy_from_slice(&self.0[0..4]);
         version
     }
@@ -39,7 +39,7 @@ impl ExtendedKey {
 
     /// Returns the parent fingerprint
     pub fn parent_fingerprint(&self) -> [u8; 4] {
-        let mut fingerprint = [u8; 4];
+        let mut fingerprint = [0u8; 4];
         fingerprint.copy_from_slice(&self.0[5..9]);
         fingerprint
     }
@@ -51,14 +51,14 @@ impl ExtendedKey {
 
     /// Returns the chain code
     pub fn chain_code(&self) -> [u8; 32] {
-        let mut chain_code = [u8; 32];
+        let mut chain_code = [0u8; 32];
         chain_code.copy_from_slice(&self.0[13..45]);
         chain_code
     }
 
     /// Returns the key data (private key or public key)
     pub fn key(&self) -> [u8; 33] {
-        let mut key = [u8; 33];
+        let mut key = [0u8; 33];
         key.copy_from_slice(&self.0[45..78]);
         key
     }
@@ -125,7 +125,7 @@ impl ExtendedKey {
         let mut child_key = ExtendedKey([0; 78]);
         child_key.0[0..4].copy_from_slice(&self.version());
         child_key.0[4] = self.depth().wrapping_add(1);
-        // Fix: Compute parent fingerprint from compressed public key
+        // Compute parent fingerprint from compressed public key
         let parent_pubkey = if is_private {
             PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?)
         } else {
@@ -152,7 +152,7 @@ impl ExtendedKey {
     }
 }
 
-impl Serializable for ExtendedKey {
+impl Serializable<ExtendedKey> for ExtendedKey {
     fn read(reader: &mut dyn Read) -> Result<ExtendedKey> {
         let mut data = [0u8; 78];
         reader.read_exact(&mut data)?;
