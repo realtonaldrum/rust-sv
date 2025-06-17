@@ -259,7 +259,7 @@ impl ExtendedKey {
         }
 
         // Compute child private key: parent_private_key + tweak (mod n)
-        let tweak_scalar = Scalar::from_be_bytes(tweak.into())
+        let tweak_scalar = Scalar::from_be_bytes(*tweak)
             .map_err(|_| Error::BadData("Invalid tweak scalar".to_string()))?;
         let mut child_private_key = private_key;
         child_private_key
