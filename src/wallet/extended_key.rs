@@ -10,7 +10,7 @@ use std::fmt;
 pub const MAINNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xAD, 0xE4]; // xprv
 pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E];  // xpub
 pub const TESTNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x83, 0x94]; // tprv
-pub const TESTNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x87, 0xCF];  // tpub
+pub const TESTNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x87, 0xCF]; // tpub
 pub const HARDENED_KEY: u32 = 0x80000000;
 
 /// Type of extended key
@@ -27,7 +27,7 @@ pub struct ExtendedKey(pub [u8; 78]);
 impl ExtendedKey {
     /// Returns the version bytes
     pub fn version(&self) -> [u8; 4] {
-        let mut version = [0u8; 4];
+        let mut version = [u8; 4];
         version.copy_from_slice(&self.0[0..4]);
         version
     }
@@ -39,7 +39,7 @@ impl ExtendedKey {
 
     /// Returns the parent fingerprint
     pub fn parent_fingerprint(&self) -> [u8; 4] {
-        let mut fingerprint = [0u8; 4];
+        let mut fingerprint = [u8; 4];
         fingerprint.copy_from_slice(&self.0[5..9]);
         fingerprint
     }
@@ -51,14 +51,14 @@ impl ExtendedKey {
 
     /// Returns the chain code
     pub fn chain_code(&self) -> [u8; 32] {
-        let mut chain_code = [0u8; 32];
+        let mut chain_code = [u8; 32];
         chain_code.copy_from_slice(&self.0[13..45]);
         chain_code
     }
 
     /// Returns the key data (private key or public key)
     pub fn key(&self) -> [u8; 33] {
-        let mut key = [0u8; 33];
+        let mut key = [u8; 33];
         key.copy_from_slice(&self.0[45..78]);
         key
     }
@@ -125,7 +125,13 @@ impl ExtendedKey {
         let mut child_key = ExtendedKey([0; 78]);
         child_key.0[0..4].copy_from_slice(&self.version());
         child_key.0[4] = self.depth().wrapping_add(1);
-        let parent_fingerprint = sha256d(&self.key()[1..33]).0[0..4].to_vec();
+        // Fix: Compute parent fingerprint from compressed public key
+        let parent_pubkey = if is_private {
+            PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?)
+        } else {
+            PublicKey::from_slice(&self.key())?
+        };
+        let parent_fingerprint = sha256d(&parent_pubkey.serialize()).0[..4].to_vec();
         child_key.0[5..9].copy_from_slice(&parent_fingerprint);
         child_key.0[9..13].copy_from_slice(&index_bytes);
         child_key.0[13..45].copy_from_slice(&result.as_ref()[32..64]);
@@ -146,7 +152,7 @@ impl ExtendedKey {
     }
 }
 
-impl Serializable<ExtendedKey> for ExtendedKey {
+impl Serializable for ExtendedKey {
     fn read(reader: &mut dyn Read) -> Result<ExtendedKey> {
         let mut data = [0u8; 78];
         reader.read_exact(&mut data)?;
@@ -193,7 +199,7 @@ pub fn derive_extended_key(
 
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
-    let _secp = Secp256k1::new(); // Prefixed with _ to suppress warning
+    let _secp = Secp256k1::new();
     let mut hmac = hmac::Context::with_key(&hmac::Key::new(hmac::HMAC_SHA512, b"Bitcoin seed"));
     hmac.update(seed);
     let result = hmac.sign();
@@ -239,8 +245,8 @@ mod tests {
         let secp = Secp256k1::new();
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
+        eprintln!("Child key bytes: {:?}", child.0);
         eprintln!("Actual tprv for m/0H: {}", encoded);
-        // Note: Expected tprv may need adjustment based on actual output
         assert_eq!(
             encoded,
             "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
