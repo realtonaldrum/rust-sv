@@ -1,8 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac::{Hmac, Mac};
-use sha2::Sha512;
+use ring::digest::{self, SHA512};
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{Read, Write};
 use std::fmt;
@@ -98,8 +97,6 @@ impl ExtendedKey {
     pub fn derive_child(&self, index: u32, secp: &Secp256k1<secp256k1::All>) -> Result<ExtendedKey> {
         let is_private = self.is_private();
         let is_hardened = index >= HARDENED_KEY;
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&self.chain_code())
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
 
         // Prepare HMAC input
         let mut hmac_input = Vec::new();
@@ -116,14 +113,10 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        hmac.update(&hmac_input);
         eprintln!("Parent chain code: {}", hex::encode(self.chain_code()));
         eprintln!("HMAC input: {}", hex::encode(&hmac_input));
 
-        let result = hmac.finalize().into_bytes();
-        if result.len() != 64 {
-            return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
-        }
+        let result = hmac_sha512(&self.chain_code(), &hmac_input);
         let il = &result[0..32]; // Left part for key tweak
         let chain_code = &result[32..64]; // Right part for chain code
         eprintln!("HMAC output il: {}", hex::encode(il));
@@ -188,6 +181,35 @@ impl fmt::Debug for ExtendedKey {
     }
 }
 
+/// Computes HMAC-SHA512 using ring::digest::SHA512
+fn hmac_sha512(key: &[u8], data: &[u8]) -> [u8; 64] {
+    let block_size = 128; // SHA512 block size
+    let mut k = [0u8; 128];
+    if key.len() > block_size {
+        let hash = digest::digest(&SHA512, key);
+        k[..hash.as_ref().len()].copy_from_slice(hash.as_ref());
+    } else {
+        k[..key.len()].copy_from_slice(key);
+    }
+    let mut inner = [0x36u8; 128];
+    let mut outer = [0x5cu8; 128];
+    for i in 0..block_size {
+        inner[i] ^= k[i];
+        outer[i] ^= k[i];
+    }
+    let mut ctx = digest::Context::new(&SHA512);
+    ctx.update(&inner);
+    ctx.update(data);
+    let inner_hash = ctx.finish();
+    ctx = digest::Context::new(&SHA512);
+    ctx.update(&outer);
+    ctx.update(inner_hash.as_ref());
+    let final_hash = ctx.finish();
+    let mut result = [0u8; 64];
+    result.copy_from_slice(final_hash.as_ref());
+    result
+}
+
 /// Derives an extended key from a seed or parent key
 pub fn derive_extended_key(
     input: &str,
@@ -196,7 +218,7 @@ pub fn derive_extended_key(
     secp: &Secp256k1<secp256k1::All>,
 ) -> Result<ExtendedKey> {
     if path.is_empty() || path == "m" {
-        let seed = hex::decode(input).map_err(|e| Error::FromHexError(e))?;
+        let seed = hex::decode(input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
         return extended_key_from_seed(&seed, network);
     }
 
@@ -207,7 +229,7 @@ pub fn derive_extended_key(
         let index_str = part.trim_end_matches(|c| c == 'H' || c == '\'');
         let index: u32 = index_str
             .parse()
-            .map_err(|e| Error::ParseIntError(e))?;
+            .map_err(|_| Error::BadData("Invalid derivation index".to_string()))?;
         let index = if is_hardened { index + HARDENED_KEY } else { index };
         key = key.derive_child(index, secp)?;
     }
@@ -215,12 +237,9 @@ pub fn derive_extended_key(
 }
 
 /// Creates an extended private key from a seed
-pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
+pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<()> {
     let _secp = Secp256k1::new();
-    let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
-        .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-    hmac.update(seed);
-    let result = hmac.finalize().into_bytes();
+    let result = hmac_sha512(b"Bitcoin seed", seed);
     if result.len() != 64 {
         return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
     }
@@ -228,7 +247,7 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
     let secret_key = SecretKey::from_slice(&result[0..32])?;
     let chain_code = &result[32..64];
 
-    let mut key = ExtendedKey([0; 78]);
+    let mut key = ExtendedKey([0u8; 78]);
     let version = match network {
         Network::Mainnet => MAINNET_PRIVATE_EXTENDED_KEY,
         Network::Testnet | Network::STN => TESTNET_PRIVATE_EXTENDED_KEY,
@@ -237,12 +256,12 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
     key.0[4] = 0;
     key.0[5..9].copy_from_slice(&[0; 4]);
     key.0[9..13].copy_from_slice(&[0; 4]);
-    key.0[13..45].copy_from_slice(chain_code);
+    key.0[13..45].copy_from_slice(&chain_code);
     key.0[45] = 0;
     key.0[46..78].copy_from_slice(&secret_key[..]);
 
     eprintln!("Master private key: {}", hex::encode(&secret_key[..]));
-    eprintln!("Master chain code: {}", hex::encode(chain_code));
+    eprintln!("Master chain code: {}", hex::encode(&chain_code[..]));
     Ok(key)
 }
 
@@ -255,8 +274,8 @@ mod tests {
     fn test_encode_decode() -> Result<()> {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let key = extended_key_from_seed(&seed, Network::Testnet)?;
-        let encoded = key.encode();
-        let decoded = ExtendedKey::decode(&encoded)?;
+        let encoded_key = key.encode();
+        let decoded_key = ExtendedKey::decode(&encoded)?;
         assert_eq!(key, decoded);
         Ok(())
     }
@@ -264,12 +283,12 @@ mod tests {
     #[test]
     fn test_path() -> Result<()> {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
-        let master = extended_key_from_seed(&seed, Network::Testnet)?;
+        let master_key = extended_key_from_seed(&seed, Network::Testnet)?;
         let secp = Secp256k1::new();
-        let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
-        let encoded = child.encode();
+        let child_key = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
+        let encoded_child = child.encode();
         assert_eq!(
-            encoded,
+            encoded_child,
             "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
         );
         Ok(())
