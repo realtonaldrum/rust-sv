@@ -3,29 +3,17 @@ use crate::transaction::sighash::{sighash, SigHashCache, SIGHASH_FORKID};
 use crate::util::{Error, Result};
 use secp256k1::{Message, PublicKey, Secp256k1};
 use secp256k1::ecdsa::Signature;
-/// Locktimes greater than or equal to this are interpreted as timestamps. Less then, block heights.
-const LOCKTIME_THRESHOLD: i32 = 500000000;
 
-/// Disables the relative lock time for the sequence field
+const LOCKTIME_THRESHOLD: i32 = 500000000;
 const SEQUENCE_LOCKTIME_DISABLE_FLAG: u32 = 1 << 31;
-/// When set, sequence uses time. When unset, it uses block height.
 const SEQUENCE_LOCKTIME_TYPE_FLAG: u32 = 1 << 22;
 
-/// Checks that external values are correct in the script
 pub trait Checker {
-    /// Checks that a signature and public key validate within a script
-    ///
-    /// Script should already have all signatures removed if they existed.
     fn check_sig(&mut self, sig: &[u8], pubkey: &[u8], script: &[u8]) -> Result<bool>;
-
-    /// Checks that the lock time is valid according to BIP 65
     fn check_locktime(&self, locktime: i32) -> Result<bool>;
-
-    /// Checks that the relative lock time enforced by the sequence is valid according to BIP 112
     fn check_sequence(&self, sequence: i32) -> Result<bool>;
 }
 
-/// Script checker that fails all transaction checks
 pub struct TransactionlessChecker {}
 
 impl Checker for TransactionlessChecker {
@@ -42,17 +30,11 @@ impl Checker for TransactionlessChecker {
     }
 }
 
-/// Checks that external values in a script are correct for a specific transaction spend
 pub struct TransactionChecker<'a> {
-    /// Spending transaction
     pub tx: &'a Tx,
-    /// Cache for intermediate sighash values
     pub sig_hash_cache: &'a mut SigHashCache,
-    /// Spending input for the script
     pub input: usize,
-    /// Amount of satoshis being spent
     pub satoshis: i64,
-    /// True if the signature must have SIGHASH_FORKID present, false if not
     pub require_sighash_forkid: bool,
 }
 
@@ -76,11 +58,10 @@ impl<'a> Checker for TransactionChecker<'a> {
         let der_sig = &sig[0..sig.len() - 1];
         let secp = Secp256k1::verification_only();
         let mut signature = Signature::from_der(der_sig)?;
-        // OpenSSL-generated signatures may not be normalized, but libsecp256kq requires them to be
         signature.normalize_s();
         let message = Message::from_digest(sig_hash.0);
         let public_key = PublicKey::from_slice(&pubkey)?;
-        Ok(secp.verify_ecdsa(message, &signature, &public_key).is_ok())
+        Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok()) // Fixed
     }
 
     fn check_locktime(&self, locktime: i32) -> Result<bool> {
