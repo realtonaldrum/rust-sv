@@ -1,6 +1,6 @@
 use hex::FromHexError;
 use ring;
-use base58::DecodeError as FromBase58Error;
+use base58::Error as FromBase58Error;
 use secp256k1;
 use std;
 use std::io;
