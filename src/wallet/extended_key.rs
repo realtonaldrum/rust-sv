@@ -3,7 +3,7 @@ use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use bs58;
 use ring::hmac;
-use secp256k1::{Secp256k1, SecretKey, PublicKey, Scalar};
+use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
@@ -227,6 +227,7 @@ impl ExtendedKey {
         let secp = Secp256k1::new();
         let private_key = SecretKey::from_slice(&self.0[46..78])?;
         let chain_code = &self.0[13..45];
+        eprintln!("HMAC key (chain code): {:?}", chain_code);
         let key = hmac::Key::new(hmac::HMAC_SHA512, chain_code);
         let hmac = if index >= HARDENED_KEY {
             let mut v = Vec::with_capacity(37);
@@ -261,15 +262,16 @@ impl ExtendedKey {
         // Debug prints
         eprintln!("Tweak: {:?}", tweak);
         eprintln!("Parent private key: {:?}", private_key.secret_bytes());
+        eprintln!("Tweak scalar: {:?}", tweak);
 
         // Compute child private key: parent_private_key + tweak (mod n)
         let mut tweak_array = [0u8; 32];
         tweak_array.copy_from_slice(tweak);
-        let tweak_scalar = Scalar::from_be_bytes(tweak_array)
-            .map_err(|_| Error::BadData("Invalid tweak scalar".to_string()))?;
+        let tweak_key = SecretKey::from_slice(&tweak_array)
+            .map_err(|_| Error::BadData("Invalid tweak key".to_string()))?;
         let mut child_private_key = private_key;
         child_private_key
-            .add_tweak(&tweak_scalar)
+            .add_assign(&tweak_key)
             .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
 
         // Debug print
@@ -283,7 +285,7 @@ impl ExtendedKey {
             &fingerprint,
             index,
             child_chain_code,
-            &child_private_key[..],
+            &child_private_key.secret_bytes(),
         )
     }
 
