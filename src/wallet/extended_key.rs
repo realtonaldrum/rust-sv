@@ -100,23 +100,28 @@ impl ExtendedKey {
         let mut hmac = hmac::Context::with_key(&hmac::Key::new(hmac::HMAC_SHA512, &self.chain_code()));
 
         // Prepare HMAC input
+        let mut hmac_input = Vec::new();
         if is_private && is_hardened {
-            hmac.update(&[0]);
-            hmac.update(&self.key()[1..33]); // Private key without prefix
+            hmac_input.push(0);
+            hmac_input.extend_from_slice(&self.key()[1..33]); // Private key without prefix
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
-            hmac.update(&pubkey.serialize());
+            hmac_input.extend_from_slice(&pubkey.serialize());
         } else {
             if is_hardened {
                 return Err(Error::InvalidOperation("Hardened derivation not supported for public keys".to_string()));
             }
-            hmac.update(&self.key()); // Public key
+            hmac_input.extend_from_slice(&self.key()); // Public key
         }
+        hmac_input.extend_from_slice(&index.to_be_bytes());
+        hmac.update(&hmac_input);
+        eprintln!("HMAC input: {}", hex::encode(&hmac_input));
 
-        hmac.update(&index.to_be_bytes());
         let result = hmac.sign();
         let il = &result.as_ref()[0..32]; // Left part for key tweak
         let chain_code = &result.as_ref()[32..64]; // Right part for chain code
+        eprintln!("HMAC output il: {}", hex::encode(il));
+        eprintln!("HMAC output chain_code: {}", hex::encode(chain_code));
 
         let mut child_key = ExtendedKey([0; 78]);
         // Set version bytes (same as parent for private keys)
@@ -139,17 +144,19 @@ impl ExtendedKey {
         // Compute child key
         if is_private {
             let parent_secret = SecretKey::from_slice(&self.key()[1..33])?;
-            let tweak = SecretKey::from_slice(il)?;
-            let child_secret = parent_secret.add_tweak(&tweak.into())?;
+            let tweak = SecretKey::from_slice(il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
+            let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
+            eprintln!("Child private key: {}", hex::encode(&child_secret[..]));
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
-            let tweak = SecretKey::from_slice(il)?;
-            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into())?;
+            let tweak = SecretKey::from_slice(il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
+            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45..78].copy_from_slice(&child_pubkey.serialize());
         }
 
+        eprintln!("Child key bytes: {:?}", child_key.0);
         Ok(child_key)
     }
 }
