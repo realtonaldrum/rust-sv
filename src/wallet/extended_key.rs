@@ -3,38 +3,39 @@ use crate::util::{hash160, sha256d, Error, Result, Serializable};
 use byteorder::{BigEndian, WriteBytesExt};
 use bs58;
 use ring::hmac;
-use secp256k1::{Secp256k1, SecretKey, PublicKey, Scalar};
+use secp256k1::{Secp256k1, SecretKey, PublicKey}; // Removed unused Scalar import
 use std::fmt;
 use std::io;
 use std::io::{Cursor, Read, Write};
 
-/// Maximum private key value (exclusive)
+// Maximum private key value (exclusive), secp256k1 curve order
 const SECP256K1_CURVE_ORDER: [u8; 32] = [
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xffe,
-    0xff, 0xff, 0xfe, 0xba, 0xe4, 0xe6, 0x48, 0xa0, 0xe8, 0x3b, 0xff, 0x5e, 0x8c,
-    0xd0, 0x36, 0x41, 0x41,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE,
+    0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B,
+    0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41,
 ];
 
-/// Index which begins the derived hardened keys
+// Index which begins the derived hardened keys
 pub const HARDENED_KEY: u32 = 0x80000000;
 
-/// "xpub" prefix for public extended keys on mainnet
+// "xpub" prefix for public extended keys on mainnet
 pub const MAINNET_PUBLIC_EXTENDED_KEY: u32 = 0x0488B21E;
-/// "xprv" prefix for private extended keys on mainnet
+// "xprv" prefix for private extended keys on mainnet
 pub const MAINNET_PRIVATE_EXTENDED_KEY: u32 = 0x0488ADE4;
-/// "tpub" prefix for public extended keys on testnet
+// "tpub" prefix for public extended keys on testnet
 pub const TESTNET_PUBLIC_EXTENDED_KEY: u32 = 0x043587CF;
-/// "tprv" prefix for private extended keys on testnet
+// "tprv" prefix for private extended keys on testnet
 pub const TESTNET_PRIVATE_EXTENDED_KEY: u32 = 0x04358394;
 
-/// Public or private key type
-#[derive(Debug, PartialEq, Eq, Hash, Copy)]
+// Public or private key type
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)] // Added Clone derive
 pub enum ExtendedKeyType {
     Public,
     Private,
 }
 
-/// A private or public key in an hierarchical deterministic wallet
+// A private or public key in an hierarchical deterministic wallet
 #[derive(Clone, Copy)]
 pub struct ExtendedKey(pub [u8; 78]);
 
@@ -61,7 +62,7 @@ impl ExtendedKey {
         {
             let mut c = Cursor::new(&mut extended_key.0 as &mut [u8]);
             match network {
-                Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PUBLIC_EXTENDED)?,
+                Network::Mainnet => c.write_u32::<BigEndian>(MAINNET_PUBLIC_EXTENDED_KEY)?, // Fixed typo
                 Network::Testnet | Network::STN => c.write_u32::<BigEndian>(TESTNET_PUBLIC_EXTENDED_KEY)?,
             }
             c.write_u8(depth)?;
@@ -89,7 +90,7 @@ impl ExtendedKey {
             return Err(Error::BadArgument("Chain code must be 32 bytes".to_string()));
         }
         if private_key.len() != 32 {
-            returnErr(Error::BadArgument("Private key must be 32".to_string()));
+            return Err(Error::BadArgument("Private key must be 32 bytes".to_string())); // Fixed returnErr to return Err
         }
         let mut extended_key = ExtendedKey([0; 78]);
         {
@@ -270,7 +271,7 @@ impl ExtendedKey {
         use num_bigint::BigUint;
         use num_traits::Num;
         let n = BigUint::from_str_radix(
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0366141",
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
             16,
         ).unwrap();
         let parent_bytes = private_key.secret_bytes();
