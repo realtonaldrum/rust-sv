@@ -262,24 +262,9 @@ impl ExtendedKey {
         // Debug prints
         eprintln!("Tweak: {:?}", tweak);
         eprintln!("Parent private key: {:?}", private_key.secret_bytes());
-        eprintln!("Tweak scalar bytes: {:?}", tweak);
+        eprintln!("Tweak bytes: {:?}", tweak);
 
         // Compute child private key: parent_private_key + tweak (mod n)
-        let mut tweak_array = [0u8; 32];
-        tweak_array.copy_from_slice(tweak);
-        let tweak_scalar = Scalar::from_be_bytes(tweak_array)
-            .map_err(|_| Error::BadData("Invalid tweak scalar".to_string()))?;
-        let mut child_private_key = private_key;
-        child_private_key
-            .add_tweak(&tweak_scalar)
-            .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
-
-        // Debug print
-        eprintln!("Child private key: {:?}", child_private_key.secret_bytes());
-        eprintln!("Child chain code: {:?}", child_chain_code);
-
-        // Manual fallback (commented unless needed)
-        /*
         use num_bigint::BigUint;
         use num_traits::Num;
         let n = BigUint::from_str_radix(
@@ -287,17 +272,22 @@ impl ExtendedKey {
             16,
         ).unwrap();
         let parent_bytes = private_key.secret_bytes();
-        let tweak_bytes = tweak_array;
+        let tweak_int = BigUint::from_bytes_be(tweak);
         let parent_int = BigUint::from_bytes_be(&parent_bytes);
-        let tweak_int = BigUint::from_bytes_be(&tweak_bytes);
         let sum = (parent_int + tweak_int) % &n;
         let sum_bytes = sum.to_bytes_be();
         let mut child_bytes = [0u8; 32];
-        child_bytes[32 - sum_bytes.len()..].copy_from_slice(&sum_bytes);
+        if sum_bytes.len() <= 32 {
+            child_bytes[32 - sum_bytes.len()..].copy_from_slice(&sum_bytes);
+        } else {
+            return Err(Error::BadData("Child private key too large".to_string()));
+        }
         let child_private_key = SecretKey::from_slice(&child_bytes)
             .map_err(|_| Error::BadData("Invalid child private key".to_string()))?;
-        eprintln!("Manual child private key: {:?}", child_private_key.secret_bytes());
-        */
+
+        // Debug print
+        eprintln!("Child private key: {:?}", child_private_key.secret_bytes());
+        eprintln!("Child chain code: {:?}", child_chain_code);
 
         let fingerprint = self.fingerprint()?;
         ExtendedKey::new_private_key(
