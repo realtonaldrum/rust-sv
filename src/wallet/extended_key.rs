@@ -8,7 +8,7 @@ use std::fmt;
 
 // Version bytes for extended keys
 pub const MAINNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xAD, 0xE4]; // xprv
-pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0xE]; // xpub
+pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E]; // xpub
 pub const TESTNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x83, 0x94]; // tprv
 pub const TESTNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x87, 0xCF]; // tpub
 pub const HARDENED_KEY: u32 = 0x80000000;
@@ -28,7 +28,7 @@ impl ExtendedKey {
     /// Returns the version bytes
     pub fn version(&self) -> [u8; 4] {
         let mut version = [0u8; 4];
-        version.copy_from_slice(&self.copy_from_slice(&self.0[0..4]);
+        version.copy_from_slice(&self.0[0..4]);
         version
     }
 
@@ -205,7 +205,7 @@ fn hmac_sha512(key: &[u8], data: &[u8]) -> [u8; 64] {
     ctx.update(&outer);
     ctx.update(inner_hash.as_ref());
     let final_hash = ctx.finish();
-    let mut result = [0u8; 64];
+    let mut result = [u8; 64];
     result.copy_from_slice(final_hash.as_ref());
     result
 }
