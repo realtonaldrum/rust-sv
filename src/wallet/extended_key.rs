@@ -8,7 +8,7 @@ use std::fmt;
 
 // Version bytes for extended keys
 pub const MAINNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xAD, 0xE4]; // xprv
-pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E]; // xpub
+pub const MAINNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x88, 0xB2, 0xE]; // xpub
 pub const TESTNET_PRIVATE_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x83, 0x94]; // tprv
 pub const TESTNET_PUBLIC_EXTENDED_KEY: [u8; 4] = [0x04, 0x35, 0x87, 0xCF]; // tpub
 pub const HARDENED_KEY: u32 = 0x80000000;
@@ -28,7 +28,7 @@ impl ExtendedKey {
     /// Returns the version bytes
     pub fn version(&self) -> [u8; 4] {
         let mut version = [0u8; 4];
-        version.copy_from_slice(&self.0[0..4]);
+        version.copy_from_slice(&self.copy_from_slice(&self.0[0..4]);
         version
     }
 
@@ -237,7 +237,7 @@ pub fn derive_extended_key(
 }
 
 /// Creates an extended private key from a seed
-pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<()> {
+pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
     let _secp = Secp256k1::new();
     let result = hmac_sha512(b"Bitcoin seed", seed);
     if result.len() != 64 {
@@ -247,7 +247,7 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<()> {
     let secret_key = SecretKey::from_slice(&result[0..32])?;
     let chain_code = &result[32..64];
 
-    let mut key = ExtendedKey([0u8; 78]);
+    let mut key = ExtendedKey([0; 78]);
     let version = match network {
         Network::Mainnet => MAINNET_PRIVATE_EXTENDED_KEY,
         Network::Testnet | Network::STN => TESTNET_PRIVATE_EXTENDED_KEY,
@@ -256,12 +256,12 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<()> {
     key.0[4] = 0;
     key.0[5..9].copy_from_slice(&[0; 4]);
     key.0[9..13].copy_from_slice(&[0; 4]);
-    key.0[13..45].copy_from_slice(&chain_code);
+    key.0[13..45].copy_from_slice(chain_code);
     key.0[45] = 0;
     key.0[46..78].copy_from_slice(&secret_key[..]);
 
     eprintln!("Master private key: {}", hex::encode(&secret_key[..]));
-    eprintln!("Master chain code: {}", hex::encode(&chain_code[..]));
+    eprintln!("Master chain code: {}", hex::encode(chain_code));
     Ok(key)
 }
 
@@ -274,8 +274,8 @@ mod tests {
     fn test_encode_decode() -> Result<()> {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let key = extended_key_from_seed(&seed, Network::Testnet)?;
-        let encoded_key = key.encode();
-        let decoded_key = ExtendedKey::decode(&encoded)?;
+        let encoded = key.encode();
+        let decoded = ExtendedKey::decode(&encoded)?;
         assert_eq!(key, decoded);
         Ok(())
     }
@@ -283,12 +283,12 @@ mod tests {
     #[test]
     fn test_path() -> Result<()> {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
-        let master_key = extended_key_from_seed(&seed, Network::Testnet)?;
+        let master = extended_key_from_seed(&seed, Network::Testnet)?;
         let secp = Secp256k1::new();
-        let child_key = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
-        let encoded_child = child.encode();
+        let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
+        let encoded = child.encode();
         assert_eq!(
-            encoded_child,
+            encoded,
             "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
         );
         Ok(())
