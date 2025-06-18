@@ -277,7 +277,8 @@ mod tests {
         let mut hmac_input = vec![0u8];
         hmac_input.extend_from_slice(private_key);
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)?;
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
+            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
         hmac.update(&hmac_input);
         let debug_hmac = hmac.finalize().into_bytes();
         eprintln!("Debug HMAC result: {}", hex::encode(&debug_hmac));
