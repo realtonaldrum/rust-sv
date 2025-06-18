@@ -127,10 +127,10 @@ impl ExtendedKey {
         if result.len() != 64 {
             return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
         }
-        let il = &result[0..32]; // Left part for key tweak
-        let chain_code = &result[32..64]; // Right part for chain code
-        eprintln!("HMAC output il: {}", hex::encode(il));
-        eprintln!("HMAC output chain_code: {}", hex::encode(chain_code));
+        let il: [u8; 32] = result[0..32].try_into().unwrap(); // Ensure copy
+        let new_chain_code: [u8; 32] = result[32..64].try_into().unwrap(); // Ensure copy
+        eprintln!("HMAC output il: {}", hex::encode(&il));
+        eprintln!("HMAC output chain_code: {}", hex::encode(&new_chain_code));
 
         let mut child_key = ExtendedKey([0; 78]);
         // Set version bytes (same as parent for private keys)
@@ -148,21 +148,21 @@ impl ExtendedKey {
         // Set child index
         child_key.0[9..13].copy_from_slice(&index.to_be_bytes());
         // Set chain code
-        child_key.0[13..45].copy_from_slice(chain_code);
+        child_key.0[13..45].copy_from_slice(&new_chain_code);
 
         // Compute child key
         if is_private {
             let parent_secret = SecretKey::from_slice(&self.key()[1..33])?;
-            let tweak = SecretKey::from_slice(il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
+            let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
             let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
             eprintln!("Parent private key: {}", hex::encode(&self.key()[1..33]));
-            eprintln!("Tweak: {}", hex::encode(il));
+            eprintln!("Tweak: {}", hex::encode(&il));
             eprintln!("Child private key: {}", hex::encode(&child_secret[..]));
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
-            let tweak = SecretKey::from_slice(il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
+            let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
             let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45..78].copy_from_slice(&child_pubkey.serialize());
         }
@@ -269,6 +269,19 @@ mod tests {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let master = extended_key_from_seed(&seed, Network::Testnet)?;
         let secp = Secp256k1::new();
+        
+        // Debug HMAC computation
+        let chain_code = master.chain_code();
+        let private_key = &master.key()[1..33]; // Skip prefix
+        let index = HARDENED_KEY;
+        let mut hmac_input = vec![0u8];
+        hmac_input.extend_from_slice(private_key);
+        hmac_input.extend_from_slice(&index.to_be_bytes());
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)?;
+        hmac.update(&hmac_input);
+        let debug_hmac = hmac.finalize().into_bytes();
+        eprintln!("Debug HMAC result: {}", hex::encode(&debug_hmac));
+        
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
         assert_eq!(
