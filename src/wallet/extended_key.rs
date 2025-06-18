@@ -1,7 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac::Hmac;
+use hmac::{Hmac, KeyInit};
 use ring::hmac as ring_hmac;
 use sha2::Sha512;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
