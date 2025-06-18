@@ -126,7 +126,7 @@ impl ExtendedKey {
         let chain_code = self.chain_code();
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&chain_code)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&hmac_input);
+        Update::update(&mut hmac, &hmac_input);
         let result = hmac.finalize().into_bytes();
         eprintln!("Raw HMAC result: {} (len: {})", hex::encode(&result), result.len());
         if result.len() != 64 {
