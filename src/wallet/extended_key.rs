@@ -105,6 +105,7 @@ impl ExtendedKey {
         if is_private && is_hardened {
             hmac_input.push(0);
             let private_key = &self.key()[1..33]; // Private key without prefix
+            eprintln!("Full key data: {} (len: {})", hex::encode(self.key()), self.key().len());
             eprintln!("Using private key for HMAC: {} (len: {})", hex::encode(private_key), private_key.len());
             if private_key.len() != 32 {
                 return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
@@ -266,8 +267,12 @@ mod tests {
     #[test]
     fn test_hmac() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
-        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
-        eprintln!("Decoded private key: {:?}", private_key);
+        let mut private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        eprintln!("Decoded private key: {:?} (len: {})", private_key, private_key.len());
+        if private_key.len() > 32 {
+            private_key.truncate(32); // Trim to 32 bytes
+            eprintln!("Trimmed private key: {:?} (len: {})", private_key, private_key.len());
+        }
         if private_key.len() != 32 {
             return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
         }
@@ -319,8 +324,12 @@ mod tests {
     #[test]
     fn test_pubkey() -> Result<()> {
         let secp = Secp256k1::new();
-        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
-        eprintln!("Decoded private key: {:?}", private_key);
+        let mut private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        eprintln!("Decoded private key: {:?} (len: {})", private_key, private_key.len());
+        if private_key.len() > 32 {
+            private_key.truncate(32); // Trim to 32 bytes
+            eprintln!("Trimmed private key: {:?} (len: {})", private_key, private_key.len());
+        }
         if private_key.len() != 32 {
             return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
         }
@@ -333,8 +342,12 @@ mod tests {
     #[test]
     fn test_hmac_manual() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
-        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
-        eprintln!("Decoded private key: {:?}", private_key);
+        let mut private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        eprintln!("Decoded private key: {:?} (len: {})", private_key, private_key.len());
+        if private_key.len() > 32 {
+            private_key.truncate(32); // Trim to 32 bytes
+            eprintln!("Trimmed private key: {:?} (len: {})", private_key, private_key.len());
+        }
         if private_key.len() != 32 {
             return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
         }
