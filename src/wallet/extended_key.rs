@@ -267,6 +267,7 @@ mod tests {
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
+        assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
         let mut hmac = Hmac::<Sha512>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
         hmac.update(&data);
@@ -301,6 +302,16 @@ mod tests {
             encoded,
             "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_pubkey() -> Result<()> {
+        let secp = Secp256k1::new();
+        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        let secret_key = SecretKey::from_slice(&private_key)?;
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+        eprintln!("Public key: {}", hex::encode(public_key.serialize()));
         Ok(())
     }
 }
