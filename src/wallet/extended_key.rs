@@ -3,7 +3,6 @@ use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
 use digest::{KeyInit, Mac, Update};
 use hmac::Hmac;
-use ring::hmac as ring_hmac;
 use sha2::Sha512;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{self, Read, Write};
@@ -125,7 +124,7 @@ impl ExtendedKey {
 
         // Compute HMAC using hmac and sha2
         let chain_code = self.chain_code();
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
+        let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&chain_code)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
         hmac.update(&hmac_input);
         let result = hmac.finalize().into_bytes();
