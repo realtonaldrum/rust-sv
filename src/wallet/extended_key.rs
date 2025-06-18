@@ -1,8 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac::{Hmac, Mac};
-use sha2::Sha512;
+use ring::hmac;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{self, Read, Write};
 use std::fmt;
@@ -121,18 +120,17 @@ impl ExtendedKey {
         eprintln!("Derive HMAC key: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
         eprintln!("Derive HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
 
-        // Compute HMAC
+        // Compute HMAC using ring
         let chain_code = self.chain_code();
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&hmac_input);
-        let result = hmac.finalize().into_bytes();
-        eprintln!("Raw HMAC result: {} (len: {})", hex::encode(&result), result.len());
-        if result.len() != 64 {
-            return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
+        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &chain_code);
+        let result = hmac::sign(&hmac_key, &hmac_input);
+        let result_bytes = result.as_ref();
+        eprintln!("Raw HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
+        if result_bytes.len() != 64 {
+            return Err(Error::BadData(format!("Invalid HMAC output length: {}", result_bytes.len())));
         }
-        let il: [u8; 32] = result[0..32].try_into().unwrap();
-        let new_chain_code: [u8; 32] = result[32..64].try_into().unwrap();
+        let il: [u8; 32] = result_bytes[0..32].try_into().unwrap();
+        let new_chain_code: [u8; 32] = result_bytes[32..64].try_into().unwrap();
         eprintln!("HMAC output il: {}", hex::encode(&il));
         eprintln!("HMAC output chain_code: {}", hex::encode(&new_chain_code));
 
@@ -268,13 +266,12 @@ mod tests {
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&key)
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&data);
-        let result = hmac.finalize().into_bytes();
-        eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
+        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &key);
+        let result = hmac::sign(&hmac_key, &data);
+        let result_bytes = result.as_ref();
+        eprintln!("HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
         assert_eq!(
-            hex::encode(&result),
+            hex::encode(result_bytes),
             "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
         );
         Ok(())
@@ -312,6 +309,27 @@ mod tests {
         let secret_key = SecretKey::from_slice(&private_key)?;
         let public_key = PublicKey::from_secret_key(&secp, &secret_key);
         eprintln!("Public key: {}", hex::encode(public_key.serialize()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_hmac_manual() -> Result<()> {
+        let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
+        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        let index = 0x80000000u32;
+        let mut data = vec![0u8];
+        data.extend_from_slice(&private_key);
+        data.extend_from_slice(&index.to_be_bytes());
+        eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
+        eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
+        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &key);
+        let result = hmac::sign(&hmac_key, &data);
+        let result_bytes = result.as_ref();
+        eprintln!("HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
+        assert_eq!(
+            hex::encode(result_bytes),
+            "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+        );
         Ok(())
     }
 }
