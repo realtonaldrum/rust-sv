@@ -28,7 +28,6 @@
 //! let signature = generate_signature(&private_key, &sighash, sighash_type).unwrap();
 //! tx.inputs[0].unlock_script = create_unlock_script(&signature, &public_key);
 //! ```
-
 use crate::util::{Hash256, Result};
 use secp256k1::{Secp256k1, Message, SecretKey, ecdsa::{Signature, SerializedSignature}};
 
@@ -44,7 +43,7 @@ pub fn generate_signature(
     let secp = Secp256k1::signing_only();
     let message = Message::from_digest(sighash.0);
     let secret_key = SecretKey::from_slice(private_key)?;
-    let mut signature: Signature = secp.sign_ecdsa(&message, &secret_key); // Fixed
+    let mut signature: Signature = secp.sign_ecdsa(message, &secret_key); // Fixed: removed & from message
     signature.normalize_s();
     let sig: SerializedSignature = signature.serialize_der();
     let mut v = sig.to_vec();
