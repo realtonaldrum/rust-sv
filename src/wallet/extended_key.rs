@@ -179,7 +179,7 @@ impl ExtendedKey {
 impl Serializable<ExtendedKey> for ExtendedKey {
     fn read(reader: &mut dyn Read) -> Result<ExtendedKey> {
         let mut data = [0u8; 78];
-        reader.read_exact(&mut data).map_err(Error::Io)?;
+        reader.read_exact(&mut data)?;
         Ok(ExtendedKey(data))
     }
 
@@ -248,7 +248,7 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
     key.0[46..78].copy_from_slice(&secret_key[..]);
 
     eprintln!("Master private key: {}", hex::encode(&secret_key[..]));
-    eprintln!("Master chain code: {}", hex::encode(chain_code));
+    eprintln!("Master chain_code: {}", hex::encode(chain_code));
     Ok(key)
 }
 
@@ -303,4 +303,4 @@ mod tests {
         );
         Ok(())
     }
-    }
+}
