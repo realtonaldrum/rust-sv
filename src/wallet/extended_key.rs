@@ -1,7 +1,8 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use ring::hmac as ring_hmac;
+use hmac::{Hmac, Mac};
+use sha2::Sha512;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{Read, Write};
 use std::fmt;
@@ -113,14 +114,16 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        eprintln!("Parent chain code: {}", hex::encode(self.chain_code()));
-        eprintln!("HMAC input: {}", hex::encode(&hmac_input));
+        eprintln!("Parent chain code: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
+        eprintln!("HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
 
         // Compute HMAC
         let chain_code = self.chain_code();
-        let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &chain_code);
-        let result = ring_hmac::sign(&key, &hmac_input).as_ref().to_vec();
-        eprintln!("Raw HMAC result: {}", hex::encode(&result));
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
+            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
+        hmac.update(&hmac_input);
+        let result = hmac.finalize().into_bytes();
+        eprintln!("Raw HMAC result: {} (len: {})", hex::encode(&result), result.len());
         if result.len() != 64 {
             return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
         }
@@ -217,8 +220,10 @@ pub fn derive_extended_key(
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
     let _secp = Secp256k1::new();
-    let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, b"Bitcoin seed");
-    let result = ring_hmac::sign(&key, seed).as_ref().to_vec();
+    let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
+        .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
+    hmac.update(seed);
+    let result = hmac.finalize().into_bytes();
     if result.len() != 64 {
         return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
     }
@@ -250,6 +255,24 @@ mod tests {
     use hex;
 
     #[test]
+    fn test_hmac() -> Result<()> {
+        let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
+        let data = hex::decode("00e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b3580000000")?;
+        eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
+        eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&key)
+            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
+        hmac.update(&data);
+        let result = hmac.finalize().into_bytes();
+        eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
+        assert_eq!(
+            hex::encode(&result),
+            "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_encode_decode() -> Result<()> {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let key = extended_key_from_seed(&seed, Network::Testnet)?;
@@ -272,9 +295,13 @@ mod tests {
         let mut hmac_input = vec![0u8];
         hmac_input.extend_from_slice(private_key);
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &chain_code);
-        let debug_hmac = ring_hmac::sign(&key, &hmac_input).as_ref().to_vec();
-        eprintln!("Debug HMAC result: {}", hex::encode(&debug_hmac));
+        eprintln!("Debug HMAC key: {} (len: {})", hex::encode(&chain_code), chain_code.len());
+        eprintln!("Debug HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
+        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
+            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
+        hmac.update(&hmac_input);
+        let debug_hmac = hmac.finalize().into_bytes();
+        eprintln!("Debug HMAC result: {} (len: {})", hex::encode(&debug_hmac), debug_hmac.len());
         
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
