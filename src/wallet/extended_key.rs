@@ -121,6 +121,7 @@ impl ExtendedKey {
         hmac_input.extend_from_slice(&index.to_be_bytes());
         eprintln!("Derive HMAC key: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
         eprintln!("Derive HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
+        eprintln!("HMAC input bytes: {:?}", hmac_input);
 
         // Compute HMAC using hmac and sha2
         let chain_code = self.chain_code();
@@ -264,7 +265,7 @@ mod tests {
         let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
         let index = 0x80000000u32; // Hardened index
         let mut data = vec![0u8];
-        data.extend_from_slice(&private_key);
+        data.extend_from_slice(&private_key[..32]); // Ensure 32 bytes
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
@@ -322,7 +323,7 @@ mod tests {
         let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
         let index = 0x80000000u32;
         let mut data = vec![0u8];
-        data.extend_from_slice(&private_key);
+        data.extend_from_slice(&private_key[..32]); // Ensure 32 bytes
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
