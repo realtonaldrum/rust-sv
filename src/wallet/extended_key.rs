@@ -1,7 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use digest::{KeyInit, Update};
+use digest::{KeyInit, Mac, Update};
 use hmac::Hmac;
 use ring::hmac as ring_hmac;
 use sha2::Sha512;
@@ -224,7 +224,7 @@ pub fn derive_extended_key(
 
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
-    let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
+    let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(b"Bitcoin seed")
         .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
     hmac.update(seed);
     let result = hmac.finalize().into_bytes();
