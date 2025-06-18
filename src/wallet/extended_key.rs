@@ -1,8 +1,8 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac;
-use ring::hmac;
+use hmac::Hmac;
+use ring::hmac as ring_hmac;
 use sha2::Sha512;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{self, Read, Write};
@@ -124,8 +124,8 @@ impl ExtendedKey {
 
         // Compute HMAC using ring
         let chain_code = self.chain_code();
-        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &chain_code);
-        let result = hmac::sign(&hmac_key, &hmac_input);
+        let hmac_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &chain_code);
+        let result = ring_hmac::sign(&hmac_key, &hmac_input);
         let result_bytes = result.as_ref();
         eprintln!("Raw HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
         if result_bytes.len() != 64 {
@@ -268,8 +268,8 @@ mod tests {
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
-        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &key);
-        let result = hmac::sign(&hmac_key, &data);
+        let hmac_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &key);
+        let result = ring_hmac::sign(&hmac_key, &data);
         let result_bytes = result.as_ref();
         eprintln!("HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
         assert_eq!(
@@ -324,8 +324,8 @@ mod tests {
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
-        let hmac_key = hmac::Key::new(hmac::HMAC_SHA512, &key);
-        let result = hmac::sign(&hmac_key, &data);
+        let hmac_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &key);
+        let result = ring_hmac::sign(&hmac_key, &data);
         let result_bytes = result.as_ref();
         eprintln!("HMAC result: {} (len: {})", hex::encode(result_bytes), result_bytes.len());
         assert_eq!(
