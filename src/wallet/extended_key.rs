@@ -114,8 +114,8 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        eprintln!("Parent chain code: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
-        eprintln!("HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
+        eprintln!("Derive HMAC key: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
+        eprintln!("Derive HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
 
         // Compute HMAC
         let chain_code = self.chain_code();
@@ -257,7 +257,11 @@ mod tests {
     #[test]
     fn test_hmac() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
-        let data = hex::decode("00e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b3580000000")?;
+        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        let index = 0x80000000u32; // Hardened index
+        let mut data = vec![0u8];
+        data.extend_from_slice(&private_key);
+        data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         let mut hmac = Hmac::<Sha512>::new_from_slice(&key)
@@ -287,21 +291,6 @@ mod tests {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let master = extended_key_from_seed(&seed, Network::Testnet)?;
         let secp = Secp256k1::new();
-        
-        // Debug HMAC computation
-        let chain_code = master.chain_code();
-        let private_key = &master.key()[1..33]; // Skip prefix
-        let index = HARDENED_KEY;
-        let mut hmac_input = vec![0u8];
-        hmac_input.extend_from_slice(private_key);
-        hmac_input.extend_from_slice(&index.to_be_bytes());
-        eprintln!("Debug HMAC key: {} (len: {})", hex::encode(&chain_code), chain_code.len());
-        eprintln!("Debug HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&hmac_input);
-        let debug_hmac = hmac.finalize().into_bytes();
-        eprintln!("Debug HMAC result: {} (len: {})", hex::encode(&debug_hmac), debug_hmac.len());
         
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
