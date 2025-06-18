@@ -61,7 +61,7 @@ impl<'a> Checker for TransactionChecker<'a> {
         signature.normalize_s();
         let message = Message::from_digest(sig_hash.0);
         let public_key = PublicKey::from_slice(&pubkey)?;
-        Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok()) // Fixed
+        Ok(secp.verify_ecdsa(message, &signature, &public_key).is_ok())
     }
 
     fn check_locktime(&self, locktime: i32) -> Result<bool> {
