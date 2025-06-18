@@ -106,7 +106,11 @@ impl ExtendedKey {
             hmac_input.push(0);
             let private_key = &self.key()[1..33]; // Private key without prefix
             eprintln!("Using private key for HMAC: {} (len: {})", hex::encode(private_key), private_key.len());
-            hmac_input.extend_from_slice(private_key);
+            if private_key.len() != 32 {
+                return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
+            }
+            hmac_input.extend_from_slice(&private_key[..32]); // Explicitly 32 bytes
+            eprintln!("Private key bytes: {:?}", private_key);
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
             eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(pubkey.serialize()), pubkey.serialize().len());
@@ -263,12 +267,16 @@ mod tests {
     fn test_hmac() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
         let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        if private_key.len() != 32 {
+            return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
+        }
         let index = 0x80000000u32; // Hardened index
         let mut data = vec![0u8];
-        data.extend_from_slice(&private_key[..32]); // Ensure 32 bytes
+        data.extend_from_slice(&private_key);
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
+        eprintln!("HMAC data bytes: {:?}", data);
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
@@ -321,12 +329,16 @@ mod tests {
     fn test_hmac_manual() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
         let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
+        if private_key.len() != 32 {
+            return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
+        }
         let index = 0x80000000u32;
         let mut data = vec![0u8];
-        data.extend_from_slice(&private_key[..32]); // Ensure 32 bytes
+        data.extend_from_slice(&private_key);
         data.extend_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
+        eprintln!("HMAC data bytes: {:?}", data);
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
         Update::update(&mut hmac, &data);
