@@ -1,8 +1,7 @@
 use crate::network::Network;
 use crate::util::{sha256d, Error, Result, Serializable};
 use base58::{ToBase58, FromBase58};
-use hmac::{Hmac, Mac};
-use sha2::Sha512;
+use ring::hmac as ring_hmac;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
 use std::io::{Read, Write};
 use std::fmt;
@@ -119,10 +118,8 @@ impl ExtendedKey {
 
         // Compute HMAC
         let chain_code = self.chain_code();
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&hmac_input);
-        let result = hmac.finalize().into_bytes();
+        let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &chain_code);
+        let result = ring_hmac::sign(&key, &hmac_input).as_ref().to_vec();
         eprintln!("Raw HMAC result: {}", hex::encode(&result));
         if result.len() != 64 {
             return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
@@ -220,10 +217,8 @@ pub fn derive_extended_key(
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
     let _secp = Secp256k1::new();
-    let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
-        .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-    hmac.update(seed);
-    let result = hmac.finalize().into_bytes();
+    let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, b"Bitcoin seed");
+    let result = ring_hmac::sign(&key, seed).as_ref().to_vec();
     if result.len() != 64 {
         return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
     }
@@ -277,10 +272,8 @@ mod tests {
         let mut hmac_input = vec![0u8];
         hmac_input.extend_from_slice(private_key);
         hmac_input.extend_from_slice(&index.to_be_bytes());
-        let mut hmac = Hmac::<Sha512>::new_from_slice(&chain_code)
-            .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&hmac_input);
-        let debug_hmac = hmac.finalize().into_bytes();
+        let key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &chain_code);
+        let debug_hmac = ring_hmac::sign(&key, &hmac_input).as_ref().to_vec();
         eprintln!("Debug HMAC result: {}", hex::encode(&debug_hmac));
         
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
