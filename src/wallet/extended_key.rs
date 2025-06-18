@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&data);
+        Update::update(&mut hmac, &data);
         let result = hmac.finalize().into_bytes();
         eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
         assert_eq!(
@@ -328,7 +328,7 @@ mod tests {
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        hmac.update(&data);
+        Update::update(&mut hmac, &data);
         let result = hmac.finalize().into_bytes();
         eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
         assert_eq!(
