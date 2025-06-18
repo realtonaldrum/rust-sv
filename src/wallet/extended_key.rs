@@ -111,7 +111,8 @@ impl ExtendedKey {
             if private_key.len() != 32 {
                 return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
             }
-            hmac_input.extend_from_slice(private_key);
+            hmac_input.extend_from_slice(&private_key[..32]); // Explicitly 32 bytes
+            eprintln!("After private key: {:?}", hmac_input);
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
             eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(pubkey.serialize()), pubkey.serialize().len());
@@ -124,8 +125,9 @@ impl ExtendedKey {
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
+        eprintln!("After index: {:?}", hmac_input);
         eprintln!("Derive HMAC key: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
-        eprintln!("Derive HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
+        eprintln!("HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
         eprintln!("HMAC input bytes: {:?}", hmac_input);
 
         // Compute HMAC using hmac and sha2
@@ -273,12 +275,10 @@ mod tests {
             return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
         }
         let index = 0x80000000u32; // Hardened index
-        let mut data = vec![0u8];
-        eprintln!("After prefix: {:?}", data);
-        data.extend_from_slice(&private_key[..32]); // Explicitly use 32 bytes
-        eprintln!("After private key: {:?}", data);
-        data.extend_from_slice(&index.to_be_bytes());
-        eprintln!("After index: {:?}", data);
+        let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
+        data[0] = 0;
+        data[1..33].copy_from_slice(&private_key[..32]);
+        data[33..37].copy_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         eprintln!("HMAC data bytes: {:?}", data);
@@ -343,12 +343,10 @@ mod tests {
             return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
         }
         let index = 0x80000000u32;
-        let mut data = vec![0u8];
-        eprintln!("After prefix: {:?}", data);
-        data.extend_from_slice(&private_key[..32]); // Explicitly use 32 bytes
-        eprintln!("After private key: {:?}", data);
-        data.extend_from_slice(&index.to_be_bytes());
-        eprintln!("After index: {:?}", data);
+        let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
+        data[0] = 0;
+        data[1..33].copy_from_slice(&private_key[..32]);
+        data[33..37].copy_from_slice(&index.to_be_bytes());
         eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
         eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
         eprintln!("HMAC data bytes: {:?}", data);
