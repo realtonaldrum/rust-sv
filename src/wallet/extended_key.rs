@@ -4,7 +4,7 @@ use base58::{ToBase58, FromBase58};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use secp256k1::{Secp256k1, SecretKey, PublicKey};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::fmt;
 
 // Version bytes for extended keys
@@ -143,11 +143,11 @@ impl ExtendedKey {
         child_key.0[4] = self.depth().wrapping_add(1);
         // Compute parent fingerprint
         let parent_pubkey = if is_private {
-            PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33]))?
+            PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?)
         } else {
             PublicKey::from_slice(&self.key())?
         };
-        let parent_fingerprint = sha256d(&parent_pubkey.serialize()).0[..4].into();
+        let parent_fingerprint: [u8; 4] = sha256d(&parent_pubkey.serialize()).0[..4].try_into().unwrap();
         child_key.0[5..9].copy_from_slice(&parent_fingerprint);
         // Set child index
         child_key.0[9..13].copy_from_slice(&index.to_be_bytes());
@@ -158,9 +158,7 @@ impl ExtendedKey {
         if is_private {
             let parent_secret = SecretKey::from_slice(&self.key()[1..33])?;
             let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
-            let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| {
-                Error::BadData(format!("Tweak failed: {}", e))
-            })?;
+            let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
             eprintln!("Parent private key: {}", hex::encode(&self.key()[1..33]));
@@ -169,9 +167,7 @@ impl ExtendedKey {
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
             let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
-            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| {
-                Error::BadData(format!("Tweak failed: {}", e))
-            })?;
+            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
             child_key.0[45..78].copy_from_slice(&child_pubkey.serialize());
         }
 
@@ -180,10 +176,10 @@ impl ExtendedKey {
     }
 }
 
-impl Serializable for ExtendedKey {
-    fn read(reader: &mut dyn Read) -> Result<Self, String> {
+impl Serializable<ExtendedKey> for ExtendedKey {
+    fn read(reader: &mut dyn Read) -> Result<ExtendedKey> {
         let mut data = [0u8; 78];
-        reader.read_exact(&mut data).map_err(|e| format!("IO error: {}", e))?;
+        reader.read_exact(&mut data).map_err(Error::Io)?;
         Ok(ExtendedKey(data))
     }
 
@@ -194,7 +190,7 @@ impl Serializable for ExtendedKey {
 }
 
 impl fmt::Debug for ExtendedKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ExtendedKey({})", self.encode())
     }
 }
@@ -204,10 +200,10 @@ pub fn derive_extended_key(
     input: &str,
     path: &str,
     network: Network,
-    secp: &Secp256k1::Key,
+    secp: &Secp256k1<secp256k1::All>,
 ) -> Result<ExtendedKey> {
     if path.is_empty() || path == "m" {
-        let seed = hex::decode(&input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
+        let seed = hex::decode(input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
         return extended_key_from_seed(&seed, network);
     }
 
@@ -227,7 +223,6 @@ pub fn derive_extended_key(
 
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
-    let secp = Secp256k1::new();
     let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
         .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
     hmac.update(seed);
@@ -308,4 +303,4 @@ mod tests {
         );
         Ok(())
     }
-}
+    }
