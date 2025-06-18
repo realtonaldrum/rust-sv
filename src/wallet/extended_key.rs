@@ -103,14 +103,18 @@ impl ExtendedKey {
         let mut hmac_input = Vec::new();
         if is_private && is_hardened {
             hmac_input.push(0);
-            hmac_input.extend_from_slice(&self.key()[1..33]); // Private key without prefix
+            let private_key = &self.key()[1..33]; // Private key without prefix
+            eprintln!("Using private key for HMAC: {} (len: {})", hex::encode(private_key), private_key.len());
+            hmac_input.extend_from_slice(private_key);
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
+            eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(pubkey.serialize()), pubkey.serialize().len());
             hmac_input.extend_from_slice(&pubkey.serialize());
         } else {
             if is_hardened {
                 return Err(Error::InvalidOperation("Hardened derivation not supported for public keys".to_string()));
             }
+            eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(&self.key()), self.key().len());
             hmac_input.extend_from_slice(&self.key()); // Public key
         }
         hmac_input.extend_from_slice(&index.to_be_bytes());
@@ -127,8 +131,8 @@ impl ExtendedKey {
         if result.len() != 64 {
             return Err(Error::BadData(format!("Invalid HMAC output length: {}", result.len())));
         }
-        let il: [u8; 32] = result[0..32].try_into().unwrap(); // Ensure copy
-        let new_chain_code: [u8; 32] = result[32..64].try_into().unwrap(); // Ensure copy
+        let il: [u8; 32] = result[0..32].try_into().unwrap();
+        let new_chain_code: [u8; 32] = result[32..64].try_into().unwrap();
         eprintln!("HMAC output il: {}", hex::encode(&il));
         eprintln!("HMAC output chain_code: {}", hex::encode(&new_chain_code));
 
@@ -139,11 +143,11 @@ impl ExtendedKey {
         child_key.0[4] = self.depth().wrapping_add(1);
         // Compute parent fingerprint
         let parent_pubkey = if is_private {
-            PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?)
+            PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33]))?
         } else {
             PublicKey::from_slice(&self.key())?
         };
-        let parent_fingerprint = sha256d(&parent_pubkey.serialize()).0[..4].to_vec();
+        let parent_fingerprint = sha256d(&parent_pubkey.serialize()).0[..4].into();
         child_key.0[5..9].copy_from_slice(&parent_fingerprint);
         // Set child index
         child_key.0[9..13].copy_from_slice(&index.to_be_bytes());
@@ -154,7 +158,9 @@ impl ExtendedKey {
         if is_private {
             let parent_secret = SecretKey::from_slice(&self.key()[1..33])?;
             let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
-            let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
+            let child_secret = parent_secret.add_tweak(&tweak.into()).map_err(|e| {
+                Error::BadData(format!("Tweak failed: {}", e))
+            })?;
             child_key.0[45] = 0; // Private key prefix
             child_key.0[46..78].copy_from_slice(&child_secret[..]);
             eprintln!("Parent private key: {}", hex::encode(&self.key()[1..33]));
@@ -163,7 +169,9 @@ impl ExtendedKey {
         } else {
             let pubkey = PublicKey::from_slice(&self.key())?;
             let tweak = SecretKey::from_slice(&il).map_err(|e| Error::BadData(format!("Invalid tweak: {}", e)))?;
-            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| Error::BadData(format!("Tweak failed: {}", e)))?;
+            let child_pubkey = pubkey.add_exp_tweak(secp, &tweak.into()).map_err(|e| {
+                Error::BadData(format!("Tweak failed: {}", e))
+            })?;
             child_key.0[45..78].copy_from_slice(&child_pubkey.serialize());
         }
 
@@ -172,21 +180,21 @@ impl ExtendedKey {
     }
 }
 
-impl Serializable<ExtendedKey> for ExtendedKey {
-    fn read(reader: &mut dyn Read) -> Result<ExtendedKey> {
+impl Serializable for ExtendedKey {
+    fn read(reader: &mut dyn Read) -> Result<Self, String> {
         let mut data = [0u8; 78];
-        reader.read_exact(&mut data)?;
+        reader.read_exact(&mut data).map_err(|e| format!("IO error: {}", e))?;
         Ok(ExtendedKey(data))
     }
 
-    fn write(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
         writer.write_all(&self.0)?;
         Ok(())
     }
 }
 
 impl fmt::Debug for ExtendedKey {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ExtendedKey({})", self.encode())
     }
 }
@@ -196,10 +204,10 @@ pub fn derive_extended_key(
     input: &str,
     path: &str,
     network: Network,
-    secp: &Secp256k1<secp256k1::All>,
+    secp: &Secp256k1::Key,
 ) -> Result<ExtendedKey> {
     if path.is_empty() || path == "m" {
-        let seed = hex::decode(input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
+        let seed = hex::decode(&input).map_err(|_| Error::BadData("Invalid hex seed".to_string()))?;
         return extended_key_from_seed(&seed, network);
     }
 
@@ -219,7 +227,7 @@ pub fn derive_extended_key(
 
 /// Creates an extended private key from a seed
 pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedKey> {
-    let _secp = Secp256k1::new();
+    let secp = Secp256k1::new();
     let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
         .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
     hmac.update(seed);
@@ -291,7 +299,7 @@ mod tests {
         let seed = hex::decode("000102030405060708090a0b0c0d0e0f")?;
         let master = extended_key_from_seed(&seed, Network::Testnet)?;
         let secp = Secp256k1::new();
-        
+
         let child = master.derive_child(HARDENED_KEY, &secp)?; // m/0H
         let encoded = child.encode();
         assert_eq!(
