@@ -2,17 +2,17 @@
 //!
 //! # Examples
 //!
-//! Send and receive a message to a node syncronously:
+//! Send and receive a message to a node synchronously:
 //!
 //! ```no_run, rust
 //! use sv::messages::{Message, Ping, Version, NODE_BITCOIN_CASH, PROTOCOL_VERSION};
-//! use sv::network::Network;
+//! use sv::network::NetworkConfig;
 //! use sv::peer::{Peer, SVPeerFilter};
 //! use sv::util::rx::Observable;
 //! use sv::util::secs_since;
 //! use std::time::UNIX_EPOCH;
 //!
-//! let (ip, port) = Network::Mainnet.seed_iter().next().unwrap();
+//! let (ip, port) = NetworkConfig::new(0).unwrap().seed_iter().next().unwrap();
 //! let version = Version {
 //!     version: PROTOCOL_VERSION,
 //!     services: NODE_BITCOIN_CASH,
@@ -21,7 +21,7 @@
 //!     ..Default::default()
 //! };
 //!
-//! let peer = Peer::connect(ip, port, Network::Mainnet, version, SVPeerFilter::new(0));
+//! let peer = Peer::connect(ip, port, NetworkConfig::new(0).unwrap(), version, SVPeerFilter::new(0));
 //! peer.connected_event().poll();
 //!
 //! let ping = Message::Ping(Ping { nonce: 0 });
@@ -30,18 +30,18 @@
 //! let response = peer.messages().poll();
 //! ```
 //!
-//! Handle node events asynronously:
+//! Handle node events asynchronously:
 //!
 //! ```no_run, rust
 //! use sv::messages::{Version, NODE_BITCOIN_CASH, PROTOCOL_VERSION};
-//! use sv::network::Network;
+//! use sv::network::NetworkConfig;
 //! use sv::peer::{Peer, PeerConnected, PeerDisconnected, PeerMessage, SVPeerFilter};
 //! use sv::util::rx::{Observable, Observer};
 //! use sv::util::secs_since;
 //! use std::sync::Arc;
 //! use std::time::UNIX_EPOCH;
 //!
-//! let (ip, port) = Network::Mainnet.seed_iter().next().unwrap();
+//! let (ip, port) = NetworkConfig::new(0).unwrap().seed_iter().next().unwrap();
 //! let version = Version {
 //!     version: PROTOCOL_VERSION,
 //!     services: NODE_BITCOIN_CASH,
@@ -50,7 +50,7 @@
 //!     ..Default::default()
 //! };
 //!
-//! let peer = Peer::connect(ip, port, Network::Mainnet, version, SVPeerFilter::new(0));
+//! let peer = Peer::connect(ip, port, NetworkConfig::new(0).unwrap(), version, SVPeerFilter::new(0));
 //!
 //! struct EventHandler {}
 //!
