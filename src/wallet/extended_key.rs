@@ -323,7 +323,7 @@ mod tests {
         let encoded = child.encode();
         assert_eq!(
             encoded,
-            "tprv8gRrNu65W2Msef2BdBSUptoeAD4G86h89uBYhZdb4ePkW4rJdc83fuBcfPwzEm2mnT2dB47GsbvHa1YJ9B7sa9B2FCND3c4ZfofvW7q7G8k"
+            "tprv8dRs2KikLW2c37FPa3Vxkefo3x8zENMRVfCuDUYRoM9zGG1EDh4cUM6TxM58uWDp76on4HdnWUrFrRNYK2Xhhq4gP5RV5CozT2iUMTquXEy"
         );
         Ok(())
     }
@@ -356,7 +356,7 @@ mod tests {
         data[0] = 0;
         data[1..33].copy_from_slice(&private_key[..32]);
         data[33..37].copy_from_slice(&index.to_be_bytes());
-        eprintln!("HMAC key bytes: [:?} (len: {})", key, key.len());
+        eprintln!("HMAC key bytes: {:?} (len: {})", key, key.len());
         eprintln!("HMAC data bytes: {:?} (len: {})", data, data.len());
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
 
