@@ -1,7 +1,6 @@
 //! A foundation for building applications on Bitcoin SV using Rust.
 
 extern crate byteorder;
-extern crate digest;
 extern crate dns_lookup;
 extern crate hex;
 #[macro_use]
