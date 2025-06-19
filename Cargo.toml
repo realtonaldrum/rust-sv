@@ -1,5 +1,5 @@
 [package]
-name = "sv"
+name = "rust-sv"
 version = "0.4.0"
 description = "A Rust library for working with the BSV blockchain."
 repository = "https://github.com/murphsicles/rust-sv"
