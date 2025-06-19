@@ -5,7 +5,7 @@ A Rust library for building Bitcoin SV applications and infrastructure, providin
 [![Crates.io](https://img.shields.io/crates/v/sv.svg)](https://crates.io/crates/sv)
 [![Documentation](https://docs.rs/sv/badge.svg)](https://docs.rs/sv/)
 [![Dependencies](https://deps.rs/repo/github/murphsicles/rust-sv/status.svg)](https://deps.rs/repo/github/murphsicles/rust-sv)
-[![Build Status](https://github.com/murphsicles/rust-sv/actions/workflows/ci.yml/badge.svg)](https://github.com/murphsicles/rust-sv/actions)
+[![Build Status](https://github.com/murphsicles/rust-sv/actions/workflows/rust.yml/badge.svg)](https://github.com/murphsicles/rust-sv/actions)
 
 ## Features
 
