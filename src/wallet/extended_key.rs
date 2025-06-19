@@ -101,40 +101,38 @@ impl ExtendedKey {
         let is_hardened = index >= HARDENED_KEY;
 
         // Prepare HMAC input
-        let mut hmac_input = Vec::new();
+        let mut hmac_input = vec![0u8; 37]; // Pre-allocate 37 bytes
+        hmac_input[0] = 0;
         if is_private && is_hardened {
-            hmac_input.push(0);
             let private_key = &self.key()[1..33]; // Private key without prefix
             eprintln!("Full key data: {} (len: {})", hex::encode(self.key()), self.key().len());
-            eprintln!("Using private key for HMAC: {} (len: {})", hex::encode(private_key), private_key.len());
-            eprintln!("Private key bytes: {:?}", private_key);
+            eprintln!("Private key bytes: {:?} (len: {})", private_key, private_key.len());
             if private_key.len() != 32 {
                 return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
             }
-            hmac_input.extend_from_slice(&private_key[..32]); // Explicitly 32 bytes
-            eprintln!("After private key: {:?}", hmac_input);
+            hmac_input[1..33].copy_from_slice(&private_key[..32]);
+            eprintln!("After private key: {:?}", &hmac_input[..33]);
         } else if is_private {
             let pubkey = PublicKey::from_secret_key(secp, &SecretKey::from_slice(&self.key()[1..33])?);
-            eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(pubkey.serialize()), pubkey.serialize().len());
-            hmac_input.extend_from_slice(&pubkey.serialize());
+            eprintln!("Using public key: {} (len: {})", hex::encode(pubkey.serialize()), pubkey.serialize().len());
+            hmac_input[1..34].copy_from_slice(&pubkey.serialize());
         } else {
             if is_hardened {
                 return Err(Error::InvalidOperation("Hardened derivation not supported for public keys".to_string()));
             }
-            eprintln!("Using public key for HMAC: {} (len: {})", hex::encode(&self.key()), self.key().len());
-            hmac_input.extend_from_slice(&self.key()); // Public key
+            eprintln!("Using public key: {} (len: {})", hex::encode(self.key()), self.key().len());
+            hmac_input[1..34].copy_from_slice(&self.key());
         }
-        hmac_input.extend_from_slice(&index.to_be_bytes());
+        hmac_input[33..37].copy_from_slice(&index.to_be_bytes());
         eprintln!("After index: {:?}", hmac_input);
-        eprintln!("Derive HMAC key: {} (len: {})", hex::encode(self.chain_code()), self.chain_code().len());
-        eprintln!("HMAC input: {} (len: {})", hex::encode(&hmac_input), hmac_input.len());
         eprintln!("HMAC input bytes: {:?}", hmac_input);
+        eprintln!("HMAC input len: {}", hmac_input.len());
 
         // Compute HMAC using hmac and sha2
         let chain_code = self.chain_code();
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&chain_code)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        Update::update(&mut hmac, &hmac_input);
+        Update::update(&mut hmac, &hmac_input[..37]); // Explicitly use 37 bytes
         let result = hmac.finalize().into_bytes();
         eprintln!("Raw HMAC result: {} (len: {})", hex::encode(&result), result.len());
         if result.len() != 64 {
@@ -265,33 +263,44 @@ pub fn extended_key_from_seed(seed: &[u8], network: Network) -> Result<ExtendedK
 mod tests {
     use super::*;
     use hex;
+    use ring::hmac as ring_hmac;
 
     #[test]
     fn test_hmac() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
-        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
-        eprintln!("Decoded private key: {:?} (len: {})", private_key, private_key.len());
-        if private_key.len() != 32 {
-            return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
-        }
+        // Hardcoded 32-byte private key
+        let private_key = [
+            232, 243, 46, 114, 61, 236, 244, 5, 26, 239, 172, 142, 44, 147, 201, 197,
+            178, 20, 49, 56, 23, 205, 176, 26, 20, 148, 185, 23, 200, 67, 107, 53,
+        ];
+        eprintln!("Private key bytes: {:?} (len: {})", private_key, private_key.len());
         let index = 0x80000000u32; // Hardened index
         let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
         data[0] = 0;
         data[1..33].copy_from_slice(&private_key[..32]);
         data[33..37].copy_from_slice(&index.to_be_bytes());
-        eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
-        eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
-        eprintln!("HMAC data bytes: {:?}", data);
+        eprintln!("HMAC key bytes: {:?} (len: {})", key, key.len());
+        eprintln!("HMAC data bytes: {:?} (len: {})", data, data.len());
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
+
+        // Compute HMAC with hmac crate
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        Update::update(&mut hmac, &data);
+        Update::update(&mut hmac, &data[..37]);
         let result = hmac.finalize().into_bytes();
         eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
+
+        // Compute HMAC with ring for reference
+        let ring_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &key);
+        let ring_result = ring_hmac::sign(&ring_key, &data[..37]);
+        let ring_bytes = ring_result.as_ref();
+        eprintln!("Ring HMAC result: {} (len: {})", hex::encode(ring_bytes), ring_bytes.len());
+
         assert_eq!(
             hex::encode(&result),
             "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
         );
+        assert_eq!(hex::encode(&result), hex::encode(ring_bytes), "HMAC mismatch with ring");
         Ok(())
     }
 
@@ -337,28 +346,39 @@ mod tests {
     #[test]
     fn test_hmac_manual() -> Result<()> {
         let key = hex::decode("873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508")?;
-        let private_key = hex::decode("e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")?;
-        eprintln!("Decoded private key: {:?} (len: {})", private_key, private_key.len());
-        if private_key.len() != 32 {
-            return Err(Error::BadData(format!("Invalid private key length: {}", private_key.len())));
-        }
+        // Hardcoded 32-byte private key
+        let private_key = [
+            232, 243, 46, 114, 61, 236, 244, 5, 26, 239, 172, 142, 44, 147, 201, 197,
+            178, 20, 49, 56, 23, 205, 176, 26, 20, 148, 185, 23, 200, 67, 107, 53,
+        ];
+        eprintln!("Private key bytes: {:?} (len: {})", private_key, private_key.len());
         let index = 0x80000000u32;
         let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
         data[0] = 0;
         data[1..33].copy_from_slice(&private_key[..32]);
         data[33..37].copy_from_slice(&index.to_be_bytes());
-        eprintln!("HMAC key: {} (len: {})", hex::encode(&key), key.len());
-        eprintln!("HMAC data: {} (len: {})", hex::encode(&data), data.len());
-        eprintln!("HMAC data bytes: {:?}", data);
+        eprintln!("HMAC key bytes: {:?} (len: {})", key, key.len());
+        eprintln!("HMAC data bytes: {:?} (len: {})", data, data.len());
+        assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
+
+        // Compute HMAC with hmac crate
         let mut hmac = <Hmac<Sha512> as KeyInit>::new_from_slice(&key)
             .map_err(|e| Error::BadData(format!("Invalid HMAC key: {}", e)))?;
-        Update::update(&mut hmac, &data);
+        Update::update(&mut hmac, &data[..37]);
         let result = hmac.finalize().into_bytes();
         eprintln!("HMAC result: {} (len: {})", hex::encode(&result), result.len());
+
+        // Compute HMAC with ring for reference
+        let ring_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, &key);
+        let ring_result = ring_hmac::sign(&ring_key, &data[..37]);
+        let ring_bytes = ring_result.as_ref();
+        eprintln!("Ring HMAC result: {} (len: {})", hex::encode(ring_bytes), ring_bytes.len());
+
         assert_eq!(
             hex::encode(&result),
             "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
         );
+        assert_eq!(hex::encode(&result), hex::encode(ring_bytes), "HMAC mismatch with ring");
         Ok(())
     }
 }
