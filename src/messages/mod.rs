@@ -6,14 +6,14 @@
 //!
 //! ```rust
 //! use sv::messages::Message;
-//! use sv::network::Network;
+//! use sv::network::NetworkConfig;
 //! use std::io::Cursor;
 //!
 //! let bytes = [
 //!     227, 225, 243, 232, 104, 101, 97, 100, 101, 114, 115,
 //!     0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 6, 224, 88, 0,
 //! ];
-//! let magic = Network::Mainnet.magic();
+//! let magic = NetworkConfig::new(0).unwrap().magic(); // Mainnet
 //! let message = Message::read(&mut Cursor::new(&bytes), magic).unwrap();
 //!
 //! match message {
