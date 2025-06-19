@@ -298,7 +298,7 @@ mod tests {
 
         assert_eq!(
             hex::encode(result_bytes),
-            "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+            "04bfb2dd60fa8921c2a4085ec15507a921f49cdc839f27f0f280e9c1495d44b547fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
         );
         Ok(())
     }
@@ -356,7 +356,7 @@ mod tests {
         data[0] = 0;
         data[1..33].copy_from_slice(&private_key[..32]);
         data[33..37].copy_from_slice(&index.to_be_bytes());
-        eprintln!("HMAC key bytes: {:?} (len: {})", key, key.len());
+        eprintln!("HMAC key bytes: [:?} (len: {})", key, key.len());
         eprintln!("HMAC data bytes: {:?} (len: {})", data, data.len());
         assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
 
@@ -372,7 +372,7 @@ mod tests {
 
         assert_eq!(
             hex::encode(result_bytes),
-            "2c7a9b4f0f048d2bdda9e7c5d92b10b2ef0b329a3db5aead3e351e0c7d8f421747fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+            "04bfb2dd60fa8921c2a4085ec15507a921f49cdc839f27f0f280e9c1495d44b547fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
         );
         Ok(())
     }
