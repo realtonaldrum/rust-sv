@@ -1,6 +1,7 @@
 //! Functions to convert data to and from mnemonic words
 
-use crate::util::{Bits, Error, Result};
+use crate::util::bits::Bits;
+use crate::util::{Error, Result};
 use ring::digest::{digest, SHA256};
 use std::str;
 
@@ -56,7 +57,7 @@ pub fn mnemonic_encode(data: &[u8], word_list: &[String]) -> Vec<String> {
     words
 }
 
-/// Decodes a neumonic into data using BIP-39
+/// Decodes a mnemonic into data using BIP-39
 pub fn mnemonic_decode(mnemonic: &[String], word_list: &[String]) -> Result<Vec<u8>> {
     let mut bits = Bits::with_capacity(mnemonic.len() * 11);
     for word in mnemonic {
@@ -123,6 +124,24 @@ mod tests {
         let mut bad_word = mnemonic.clone();
         bad_word[0] = "123".to_string();
         assert!(mnemonic_decode(&bad_word, &wordlist).is_err());
+    }
+
+    #[test]
+    fn test_bsvwasm_seed2mnemonic() {
+        let h = hex::decode("21ff6898636d33a76a6238d2b08ab1c0").unwrap();
+        let wordlist = load_wordlist(Wordlist::English);
+        let n = mnemonic_encode(&h, &wordlist).join(" ");
+        assert!(n == "capable win champion short spring squirrel praise either sport lounge property leopard");
+    }
+
+    #[test]
+    fn test_bsvwasm_mnemonic2seed() {
+        let mnemonic = "capable win champion short spring squirrel praise either sport lounge property leopard";
+        let wordlist = load_wordlist(Wordlist::English);
+        let mnemonic_vec: Vec<String> = mnemonic.split_whitespace().map(|s| s.to_string()).collect();
+        let seed = mnemonic_decode(&mnemonic_vec, &wordlist).unwrap();
+        let seed_hex = hex::encode(&seed);
+        assert!(seed_hex == "21ff6898636d33a76a6238d2b08ab1c0");
     }
 
     #[test]
