@@ -25,7 +25,7 @@ mod checker;
 mod interpreter;
 #[allow(dead_code)]
 pub mod op_codes;
-mod stack;
+pub mod stack;
 
 pub use self::checker::{Checker, TransactionChecker, TransactionlessChecker};
 pub(crate) use self::interpreter::next_op;
