@@ -16,10 +16,10 @@
 //  Normal Derivationpath: m/423/0/0/ = path/
 //
 //  Type: path/[<typeIndex>:<index>;]
-//      Type Index 0: Receive Payments / Change Adresses (All your positive amounts)
-//      Type Index 1: Send Payments Adresses (All your negative amounts)
-//      Type Index 2: Receive Inscriptions (All you bought items)
-//      Type Index 3: Send Inscriptions (All your sold items)
+//      Type Index 0: Received Payments / Change Adresses (All your positive amounts)
+//      Type Index 1: Sent Payments Adresses (All your negative amounts)
+//      Type Index 2: Received Inscriptions (All your bought items)
+//      Type Index 3: Sent Inscriptions (All your sold items)
 //      -> Can be expanded for more types
 //
 //  Spots of Interest: <index>
@@ -29,7 +29,7 @@
 //
 //  i_min = 70  - Means below Index 70 we assume to have a balance of 0 AND have been used previously.
 //                Reuse is not recommended for Privacy. Index 70 marks the first UTXO with a positive balance.
-//  i_max = 105 - Means we assume everything above Index 105 has a balance of 0 satoshi as well and have not been used previously.
+//  i_max = 105 - Means we assume everything above Index 105 has a balance of 0 Satoshi as well and have not been used previously.
 //  i_unused = i_max + 1 = 106 - Marks the adresse we can use for receiving funds.
 //  We can also apply a gap_limit on i_max, so we see if we received anything.
 //
