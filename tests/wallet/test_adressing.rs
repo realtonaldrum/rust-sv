@@ -1,0 +1,267 @@
+#[cfg(test)]
+mod tests {
+    use rustsv::wallet::adressing::*;
+    use rustsv::wallet::derivation::Network;
+    use rustsv::util::Error;
+    
+    const EXTENDED_DERIVATIONPATH : &str = "m/44/0/0/[0:70-105;1:30;2:0,1,2,3,4,5,6,7;3:0;4':35;5H:55;6h:66]";
+
+    #[test]
+    fn test_extract_brackets(){
+        match extract_brackets(EXTENDED_DERIVATIONPATH) {
+            Some(bracket_content) => println!("Bracket Content: [{}]", bracket_content),
+            None => println!("No brackets found"),
+        }
+    }
+
+    #[test]
+    fn test_exclude_brackets(){
+        let derivationpath = exclude_brackets(EXTENDED_DERIVATIONPATH);
+        println!("Derivation Path (normalized): {}", derivationpath);
+        assert_eq!(derivationpath, "m/44/0/0", "Derivation path does not match expected value");
+    }
+  
+    #[test]
+    fn test_extract_typeindex() {
+        let bracket_content = "0:70-105;1H:0,1,2,3,4,5,6,7;2:200-300;2h:400-500;3':600-700";
+
+        let result1 = extract_typeindex(bracket_content, "0");
+        println!("{:?}", result1); // Outputs: Some("70-105")
+
+        // Hardened index
+        let result2 = extract_typeindex(bracket_content, "1H");
+        println!("{:?}", result2); // Outputs: Some("0,1,2,3,4,5,6,7")
+
+        // Hardened index
+        let result3 = extract_typeindex(bracket_content, "2h");
+        println!("{:?}", result3); // Outputs: Some("400-500")
+
+        // Hardened index
+        let result4 = extract_typeindex(bracket_content, "3'");
+        println!("{:?}", result4); // Outputs: Some("600-700")
+
+        // Non-hardened index
+        let result5 = extract_typeindex(bracket_content, "2");
+        println!("{:?}", result5); // Outputs: Some("200-300")
+
+        // Non-existent index
+        let result6 = extract_typeindex(bracket_content, "4");
+        println!("{:?}", result6); // Outputs: None
+    }
+
+    #[test]
+    fn test_extract_with_nonhardended_typeindex() {
+        let bracket_content = extract_brackets(EXTENDED_DERIVATIONPATH);
+        match bracket_content {
+            Some(content) => {
+                let typeindex = "2";
+                let result = extract_typeindex(&content, typeindex);
+                println!("Get Values of TypeIndex {:?} : {:?}", typeindex, result);
+                assert_eq!(
+                    result,
+                    Some("0,1,2,3,4,5,6,7".to_string()),
+                    "Expected value for typeindex {} does not match",
+                    typeindex
+                );
+
+                // Test for non-existent typeindex
+                let typeindex = "15";
+                let result = extract_typeindex(&content, typeindex);
+                assert_eq!(result, None, "Expected None for non-existent typeindex");
+            }
+            None => panic!("Expected bracket content but found None"),
+        }
+    }
+
+    #[test]
+    fn test_extract_with_hardended_typeindex() {
+        let bracket_content = extract_brackets(EXTENDED_DERIVATIONPATH);
+        match bracket_content {
+            Some(content) => {
+                let typeindex = "0";
+                let result = extract_typeindex(&content, typeindex);
+                println!("Get Values of TypeIndex {:?} : {:?}", typeindex, result);
+                assert_eq!(
+                    result,
+                    Some("70-105".to_string()),
+                    "Expected value for typeindex {} does not match",
+                    typeindex
+                );
+
+                let typeindex = "4'";
+                let result = extract_typeindex(&content, typeindex);
+                assert_eq!(result, Some("35".to_string()), "Expected None for non-existent typeindex");
+
+                let typeindex = "5H";
+                let result = extract_typeindex(&content, typeindex);
+                assert_eq!(result, Some("55".to_string()), "Expected None for non-existent typeindex");
+
+                let typeindex = "6h";
+                let result = extract_typeindex(&content, typeindex);
+                assert_eq!(result, Some("66".to_string()), "Expected None for non-existent typeindex");
+
+                // Test for non-existent typeindex
+                let typeindex = "15";
+                let result = extract_typeindex(&content, typeindex);
+                assert_eq!(result, None, "Expected None for non-existent typeindex");
+            }
+            None => panic!("Expected bracket content but found None"),
+        }
+    }
+
+    #[test]
+    fn test_get_indexes_in_array() {
+        // Test range format
+        let result = get_indexes_in_array("8-11").unwrap();
+        assert_eq!(result, vec![8, 9, 10, 11], "Range 8-11 failed");
+
+        // Test comma-separated list
+        let result = get_indexes_in_array("0,1,2,3,4,5,6,7").unwrap();
+        assert_eq!(result, vec![0, 1, 2, 3, 4, 5, 6, 7], "Comma-separated list failed");
+
+        // Test single number
+        let result = get_indexes_in_array("30").unwrap();
+        assert_eq!(result, vec![30], "Single number failed");
+
+        // Test invalid range
+        assert!(get_indexes_in_array("11-8").is_err(), "Invalid range should fail");
+
+        // Test invalid number
+        assert!(get_indexes_in_array("a-11").is_err(), "Invalid number in range should fail");
+
+        // Test invalid list
+        assert!(get_indexes_in_array("0,1,a,3").is_err(), "Invalid number in list should fail");
+
+        // TEST MOAR ADVANCED STUFF
+    }
+
+    #[test]
+    fn test_extended_derivationpath_to_index_array() {
+        let bracket_content = extract_brackets(EXTENDED_DERIVATIONPATH).expect("Failed to extract brackets");
+        let typeindex = "0";
+        let typeindex_content = extract_typeindex(&bracket_content, typeindex).expect("Failed to extract typeindex 0");
+        println!("Bracket Content: {}", typeindex_content);
+        let result = get_indexes_in_array(&typeindex_content).unwrap();
+        println!("Result for Array: {:?}", result);
+        assert_eq!(
+            result,
+            vec![70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+            "Parsing typeindex {} failed",
+            typeindex
+        );
+    }
+
+    #[test]
+    fn test_more_advanced_combinations() {
+        let advanced_extended_derivatonpath = "m/69'/0'/0'/[0:70-105,90-120,88,69,70-75;]";
+        let bracket_content = extract_brackets(advanced_extended_derivatonpath).expect("Failed to extract brackets");
+        let typeindex = "0";
+        let typeindex_content = extract_typeindex(&bracket_content, typeindex).expect("Failed to extract typeindex 0");
+        println!("Bracket Content: {}", typeindex_content);
+        let result = get_indexes_in_array(&typeindex_content).unwrap();
+        println!("Result for Array: {:?}", result);
+        assert_eq!(
+                result,
+                (69..=120).collect::<Vec<usize>>(),
+                "Parsing typeindex {} failed",
+                typeindex
+            );
+    }
+
+    #[test]
+    fn test_get_typeindex_indices() {
+        let advanced_extended_derivatonpath = "m/69'/0'/0'/[0:70-105,90-120,88,69,70-75;]";
+        let typeindex = "0";
+        let result = get_typeindex_indices(advanced_extended_derivatonpath, typeindex);
+        println!("Result for Array: {:?}", result);
+        match result {
+            Ok(value) => assert_eq!(
+                value,
+                (69..=120).collect::<Vec<usize>>(),
+                "Parsing typeindex {} failed",
+                typeindex
+            ),
+            Err(e) => panic!("Parsing typeindex {} failed: {:?}", typeindex, e),
+        }
+
+        let advanced_extended_derivatonpath = "m/69'/0'/0'/[1H:70-105,90-120,88,69,70-75;]";
+        let typeindex = "1H";
+        let result = get_typeindex_indices(advanced_extended_derivatonpath, typeindex);
+        println!("Result for Array: {:?}", result);
+        match result {
+            Ok(value) => assert_eq!(
+                value,
+                (69..=120).collect::<Vec<usize>>(),
+                "Parsing typeindex {} failed",
+                typeindex
+            ),
+            Err(e) => panic!("Parsing typeindex {} failed: {:?}", typeindex, e),
+        }
+
+        let advanced_extended_derivatonpath = "m/69'/0'/0'/[2':70-105,90-120,88,69,70-75;]";
+        let typeindex = "2'";
+        let result = get_typeindex_indices(advanced_extended_derivatonpath, typeindex);
+        println!("Result for Array: {:?}", result);
+        match result {
+            Ok(value) => assert_eq!(
+                value,
+                (69..=120).collect::<Vec<usize>>(),
+                "Parsing typeindex {} failed",
+                typeindex
+            ),
+            Err(e) => panic!("Parsing typeindex {} failed: {:?}", typeindex, e),
+        }
+
+
+        let advanced_extended_derivatonpath = "m/69'/0'/0'/[3h:70-105,90-120,88,69,70-75;]";
+        let typeindex = "3h";
+        let result = get_typeindex_indices(advanced_extended_derivatonpath, typeindex);
+        println!("Result for Array: {:?}", result);
+        match result {
+            Ok(value) => assert_eq!(
+                value,
+                (69..=120).collect::<Vec<usize>>(),
+                "Parsing typeindex {} failed",
+                typeindex
+            ),
+            Err(e) => panic!("Parsing typeindex {} failed: {:?}", typeindex, e),
+        }
+
+
+    }
+
+    #[test]
+    fn test_encode_decode_p2pkh() -> Result<(), Error> {
+        let pubkey_hash: [u8; 20] = hex::decode("1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b")?
+            .try_into()
+            .unwrap();
+        let address = encode_p2pkh_address(Network::Mainnet, &pubkey_hash)?;
+        assert_eq!(address, "13PNN3hx4wxHBLFwLNNwmKxD6V5jFZQo6s");
+        let (version, decoded) = decode_address(&address)?;
+        assert_eq!(version, constants::MAINNET_P2PKH_VERSION);
+        assert_eq!(decoded, pubkey_hash.to_vec());
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_decode_p2sh() -> Result<(), Error> {
+        let script_hash: [u8; 20] = hex::decode("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0")?
+            .try_into()
+            .unwrap();
+        let address = encode_p2sh_address(Network::Testnet, &script_hash)?;
+        let (version, decoded) = decode_address(&address)?;
+        assert_eq!(version, constants::TESTNET_P2SH_VERSION);
+        assert_eq!(decoded, script_hash.to_vec());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_address() -> Result<(), Error> {
+        let valid_mainnet = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+        let valid_testnet = "mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn";
+        validate_address(Network::Mainnet, valid_mainnet)?;
+        validate_address(Network::Testnet, valid_testnet)?;
+        assert!(validate_address(Network::Mainnet, valid_testnet).is_err());
+        Ok(())
+    }
+}
