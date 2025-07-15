@@ -91,6 +91,7 @@ mod tests {
         }
     }
 
+    // All constants need to be in the same key structure family.
     const MNEMONIC: &str  = "okay captain agent open bring try seven you able scene art there ski olive dress";
     const EXPECTED_ENTROPY: &str = "99e44413cd91c3d3f12ff900581033703ca53450";
     const EXPECTED_SEED : &str  = "e5dfcbe3c62fb5e4d7dbb794119fcd9a8fbaeed04b841ad6a3d4652b2e211f370e75dc1f71a61cb6027ff360bf7826272541c0724beff9bd6c358a046497449c";
