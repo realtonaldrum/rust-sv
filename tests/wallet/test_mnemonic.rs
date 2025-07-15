@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod tests {
     use rustsv::wallet::mnemonic::*;
+    use rustsv::wallet::derivation::{derive_seed_or_extended_key, Network};
 
+    // Generate via https://iancoleman.io/bip39/ or with the test_generate_new_seed() function:
     #[test]
     fn test_generate_new_seed() {
         for &word_count in &[12, 15, 18, 21, 24] {
@@ -89,10 +91,11 @@ mod tests {
         }
     }
 
-    const MNEMONIC: &str  = "topic bright pass avocado weapon exist intact liberty sting little reveal settle impact senior regular symptom wide rule grace winner chest receive couch near";
-    const EXPECTED_ENTROPY: &str = "e503828287ff849f9d6407d5f052e1e2371d876d36e4fab7a595fdf279670c3c";
-    const EXPECTED_SEED : &str  = "602b87ace44c3b39b2a0dac3430a61078af43c24ce9952c31b73915dcf0da57327adfe38f774c642069e67840c31380cae197e086810bc29b8ee2c07469a2982";
-
+    const MNEMONIC: &str  = "okay captain agent open bring try seven you able scene art there ski olive dress";
+    const EXPECTED_ENTROPY: &str = "99e44413cd91c3d3f12ff900581033703ca53450";
+    const EXPECTED_SEED : &str  = "e5dfcbe3c62fb5e4d7dbb794119fcd9a8fbaeed04b841ad6a3d4652b2e211f370e75dc1f71a61cb6027ff360bf7826272541c0724beff9bd6c358a046497449c";
+    const EXPECTED_BIP32_MASTERKEY : &str = "xprv9s21ZrQH143K3XVnYZ9RtEiFWodPvMz3SCRt8nWzTx6zS9mJfTpLStJrNa2Bd9v8kwFdDJkWizK62FBmRGDW8MEZciMBzw3zMwZcXophEF6";
+    
     #[test]
     fn test_mnemonic_to_seed(){
         // let wordlist = load_wordlist(Wordlist::English);
@@ -329,5 +332,32 @@ mod tests {
         let mnemonic = "  CAPABLE   WIN  champion SHORT   Ascending triangle";
         let result = mnemonic_to_seed(mnemonic, "");
         assert!(result.is_err(), "Mnemonic should be rejected as invalid");
+    }
+
+    #[test]
+    fn test_seed_to_bip32_master_privatekey() {
+        let seed = mnemonic_to_seed(MNEMONIC, "").expect("Failed to derive seed");
+
+        // Convert the seed to a hex string for comparison
+        let seed_hex = hex::encode(&seed);
+
+        assert_eq!(
+            seed_hex,
+            EXPECTED_SEED,
+            "Seed does not match expected value"
+        );
+
+        if seed_hex == EXPECTED_SEED {
+            println!("Seed Match: {}", seed_hex);
+        }
+
+        let mpriv_result = derive_seed_or_extended_key(&seed_hex, "m/" ,Network::Mainnet)
+            .expect("Failed to derive BIP32 master private key");
+
+        assert_eq!(
+            mpriv_result.extended_private_key,
+            EXPECTED_BIP32_MASTERKEY,
+            "BIP32 Master Private Key does not match expected value"
+        );
     }
 }

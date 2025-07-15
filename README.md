@@ -24,7 +24,7 @@ Add `rust-sv` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sv = "0.4.1"
+rustsv = "0.4.2"
 ```
 
 Or use the latest development version:
@@ -51,7 +51,7 @@ sudo apt-get update && sudo apt-get install -y libzmq3-dev
 ### Encode a Base58 Address
 
 ```rust
-use rustsv::address::{addr_encode, AddressType};
+use rustsv::wallet::adressing::{addr_encode, AddressType};
 use rustsv::network::Network;
 use rustsv::util::hash160;
 
@@ -63,7 +63,7 @@ println!("Address: {}", addr);
 ### Decode a Base58 Address
 
 ```rust
-use rustsv::address::addr_decode;
+use rustsv::wallet::adressing::addr_decode;
 use rustsv::network::Network;
 
 let addr = "15wpV72HRpAFPMmosR3jvGq7axU7t6ghX5";
