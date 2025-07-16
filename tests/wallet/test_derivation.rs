@@ -3,8 +3,9 @@ mod tests {
     use rustsv::wallet::derivation::*;
     use rustsv::util::Error;
     
-    const SEED: &str = "cc9266f7826d236dea8be9553e33d430f2c393332022031dd1037235b2a49c49789c9221f733c227330adcc0d95cf4365de178aed36a2569eadc7721227c8026";
-    const EXPECTED_MASTER_PRIV: &str = "xprv9s21ZrQH143K42KFE1hos9hrU9hHveVk7AHkV3ca2Ks3k3C6z59oEz6La7ervLcs4v9wYdCKZkWcgrnqzqzsQnSVG5kmVFNCfRSrE7T6Tkg";
+    const SEED: &str = "e5dfcbe3c62fb5e4d7dbb794119fcd9a8fbaeed04b841ad6a3d4652b2e211f370e75dc1f71a61cb6027ff360bf7826272541c0724beff9bd6c358a046497449c";
+    const EXPECTED_MASTER_PRIV: &str = "xprv9s21ZrQH143K3XVnYZ9RtEiFWodPvMz3SCRt8nWzTx6zS9mJfTpLStJrNa2Bd9v8kwFdDJkWizK62FBmRGDW8MEZciMBzw3zMwZcXophEF6";
+    // const EXPECTED_MASTER_PUB: &str = "xpub661MyMwAqRbcG1aFeagSFNez4qTtKphtoRMUwAvc2HdyJx6TD18azgdLDqNQNxxb9So1MEfG8oRn2ryuzCB4GFt87Lhh5wWy9r5g6xEVdrD";
 
     #[test]
     fn test_master_xpriv_from_seed()  -> Result<(), Error> {

@@ -103,7 +103,7 @@ fn sha256d(data: &[u8]) -> [u8; 32] {
     result
 }
 
-/// Represents a BIP-32 extended key (private or public)
+/// Represents a BIP-32 extended key (private or public) as a simple 78 character long string
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtendedKey(pub [u8; 78]);
 

@@ -9,7 +9,7 @@ mod tests {
     #[test]
     fn test_extract_brackets(){
         match extract_brackets(EXTENDED_DERIVATIONPATH) {
-            Some(bracket_content) => println!("Bracket Content: [{}]", bracket_content),
+            Some(bracket_content) => println!("test_extract_brackets - Bracket Content: [{}]", bracket_content),
             None => println!("No brackets found"),
         }
     }
@@ -140,7 +140,7 @@ mod tests {
         let bracket_content = extract_brackets(EXTENDED_DERIVATIONPATH).expect("Failed to extract brackets");
         let typeindex = "0";
         let typeindex_content = extract_typeindex(&bracket_content, typeindex).expect("Failed to extract typeindex 0");
-        println!("Bracket Content: {}", typeindex_content);
+        println!("test_extended_derivationpath_to_index_array - Bracket Content: {}", typeindex_content);
         let result = get_indexes_in_array(&typeindex_content).unwrap();
         println!("Result for Array: {:?}", result);
         assert_eq!(
@@ -157,9 +157,9 @@ mod tests {
         let bracket_content = extract_brackets(advanced_extended_derivatonpath).expect("Failed to extract brackets");
         let typeindex = "0";
         let typeindex_content = extract_typeindex(&bracket_content, typeindex).expect("Failed to extract typeindex 0");
-        println!("Bracket Content: {}", typeindex_content);
+        println!("test_more_advanced_combinations - Bracket Content: {}", typeindex_content);
         let result = get_indexes_in_array(&typeindex_content).unwrap();
-        println!("Result for Array: {:?}", result);
+        println!("test_more_advanced_combinations - Result for Array: {:?}", result);
         assert_eq!(
                 result,
                 (69..=120).collect::<Vec<usize>>(),
