@@ -353,7 +353,7 @@ fn decode_extended_key(input: &str) -> Result<(Vec<u8>, [u8; 4]), Error> {
     Ok((payload.to_vec(), version))
 }
 
-// Derives a child key from the current key
+// Helper function for derive_seed_or_extended_key() that derives a child key from the current key
 fn derive_child_key(
     private_key: &mut Option<SecretKey>,
     public_key: &mut Option<PublicKey>,
@@ -406,6 +406,7 @@ fn derive_child_key(
     Ok(())
 }
 
+// Powerful function that handles bascially everything you need
 pub fn derive_seed_or_extended_key(
     input: &str,
     path: &str,
