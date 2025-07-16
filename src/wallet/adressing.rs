@@ -14,28 +14,32 @@
 // 
 //  How the string is being read:
 //  Normal Derivationpath: m/423/0/0/ = path/
+//  Extended Derivationpath = "m/423/0/0/[0:70-105;1:30;2:0,1,2,3,4,5,6,7;3:0;]" 
 //
 //  Type: path/[<typeIndex>:<index>;]
 //      Type Index 0: Received Payments / Change Adresses (All your positive amounts)
-//      Type Index 1: Send Payments Adresses (All your negative amounts)
+//      Type Index 1: Sent Payments Adresses (All your negative amounts)
 //      Type Index 2: Received Inscriptions (All your bought items)
-//      Type Index 3: Send Inscriptions (All your sold items)
+//      Type Index 3: Sent Inscriptions (All your sold items)
 //      -> Can be expanded for more types
+//
+//  Hardended TypeIndexes are also supported
 //
 //  Spots of Interest: <index>
 //  We extract 0:70-105 from the Extended Derivation path and look it up.
 //  Be aware of the Semicolon ; at each end of each section.
-//  It marks the end of each section, so we can extract each section better.
+//  It marks the end of each section (path branch), so we can extract each section better.
 //
-//  i_min = 70  - Means below Index 70 we assume to have a balance of 0 AND have been used previously.
-//                Reuse is not recommended for Privacy. Index 70 marks the first UTXO with a positive balance.
-//  i_max = 105 - Means we assume everything above Index 105 has a balance of 0 satoshi as well and have not been used previously.
-//  i_unused = i_max + 1 = 106 - Marks the adresse we can use for receiving funds.
+//  i_min = 70  - Means below Index 70 we assume to have a balance of 0 AND everything 
+//                below that index number has been used previously. Reuse is not recommended 
+//                for Privacy. Index 70 marks the first UTXO with a positive balance.
+//  i_max = 105 - Means we assume everything above Index 105 has a balance of 0 Satoshi as well 
+//                because everything above that number is unused.
+//  i_unused = i_max + 1 = 106 - Marks the first unused adresse that we can use for our type index use case.
 //  We can also apply a gap_limit on i_max, so we see if we received anything.
 //
 //  To receive your transaction history, you have to get i_max as your latest UTXO and go backwards in time.
 //  The indexes should all be in chronolocial order when one-time usage of Bitcoin addresses is applied correctly.
-//  Goal is to include this syntax into the derive_seed_or_extended_key function as the path parameter in derivation.rs of this library
 
 // use crate::wallet::adressing::{exclude_brackets, get_nonhardend_typeindex_indices};
 use crate::wallet::derivation::{derive_seed_or_extended_key, Network,  ExtendedKey};
