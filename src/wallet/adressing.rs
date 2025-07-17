@@ -153,7 +153,6 @@ pub fn get_typeindex_indices(extended_derivationpath: &str, typeindex: &str) -> 
 
 /////////////// 
 
-
 pub fn encode_address(_network: Network, version: u8, payload: &[u8]) -> Result<String> {
     if payload.len() != 20 {
         return Err(Error::BadArgument("Payload must be 20 bytes".to_string()));
@@ -208,14 +207,12 @@ pub fn validate_address(network: Network, address: &str) -> Result<()> {
     Ok(())
 }
 
-
 pub fn get_publickey_array_from_extended_derivationpath(
     extended_key: &str,
     extended_derivationpath: &str,
     typeindex: &str,
     network: Network,
 ) -> Result<Vec<String>> {
-
 
     // Get the indices for the given typeindex
     let indices = get_typeindex_indices(extended_derivationpath, typeindex)?;
@@ -246,8 +243,6 @@ pub fn get_publickey_array_from_extended_derivationpath(
 
     addresses
 }
-
-
 
 // Custom function to generate P2PKH address from a public key using encode_p2pkh_address
 pub fn public_key_to_p2pkh_address(pubkey: &[u8], network: Network) -> Result<String> {
