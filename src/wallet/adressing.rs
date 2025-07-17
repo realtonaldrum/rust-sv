@@ -42,7 +42,7 @@
 //  The indexes should all be in chronolocial order when one-time usage of Bitcoin addresses is applied correctly.
 
 // use crate::wallet::adressing::{exclude_brackets, get_nonhardend_typeindex_indices};
-use crate::wallet::derivation::{derive_seed_or_extended_key, Network,  ExtendedKey};
+use crate::wallet::derivation::{derive_seed_or_extended_key, ExtendedKey, Network};
 use sha2::{Digest, Sha256};
 use ripemd::Ripemd160;
 use base58::{ToBase58, FromBase58};
@@ -293,3 +293,63 @@ pub fn get_adresse_array_from_extended_derivationpath(
     addresses
 }
 
+pub fn get_unused_address(
+    extended_key: &str,
+    extended_derivation_path: &str,
+    type_index: &str,
+    network: Network,
+    gap_limit: usize,
+    pk_or_bitcoin_address: bool,
+) -> Result<String> {
+    let type_index_indices = get_typeindex_indices(extended_derivation_path, type_index)?;
+
+    // Array adjustment while looking for balance, then:
+    let _i_min = type_index_indices
+        .iter()
+        .min()
+        .ok_or_else(|| Error::BadData("No indices found".to_string()))?;
+    let i_max = type_index_indices
+        .iter()
+        .max()
+        .ok_or_else(|| Error::BadData("No indices found".to_string()))?;
+    let i_unused = i_max + 1;
+    let _i_gap_max = i_max + gap_limit;
+
+    // Construct the unused path based on derivation path type
+    let unused_path = if extended_derivation_path.starts_with("path/") {
+        // For path/ style, use type_index and i_unused directly
+        format!("path/{}/{}", type_index, i_unused)
+    } else if extended_derivation_path.starts_with("m/") {
+        // For m/ style, use base path without brackets
+        let base_path = exclude_brackets(extended_derivation_path);
+        println!("DEBUG - base_path {}", base_path);
+        format!("{}/{}/{}", base_path, type_index, i_unused)
+    } else {
+        return Err(Error::BadData(
+            "Invalid derivation path: must start with 'm/' or 'path/'".to_string(),
+        ));    
+    };
+
+    println!("DEBUG - unused_path {}", unused_path);
+
+    // Derive the child keypair for the unused path
+    let child_keypair = derive_seed_or_extended_key(extended_key, &unused_path, network)?;
+
+    // Extract the public key from the extended public key
+    let extended_key_obj = ExtendedKey::decode(&child_keypair.extended_public_key)
+        .map_err(|e| Error::Bip32Error(format!("Failed to decode extended public key: {}", e)))?;
+    let bip32_key = extended_key_obj
+        .to_bip32_keyobject()
+        .map_err(|e| Error::Bip32Error(format!("Failed to convert to BIP-32 key object: {}", e)))?;
+    let public_key_bytes = bip32_key.get_public_key();
+
+    // Return either the hex-encoded public key or the P2PKH address
+    if pk_or_bitcoin_address {
+        // Return hex-encoded public key
+        Ok(hex::encode(public_key_bytes))
+    } else {
+        // Generate P2PKH address from the public key
+        let address = public_key_to_p2pkh_address(&public_key_bytes, network)?;
+        Ok(address)
+    }
+}

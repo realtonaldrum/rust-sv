@@ -3,7 +3,8 @@ mod tests {
     use rustsv::wallet::adressing::*;
     use rustsv::wallet::derivation::Network;
     use rustsv::util::Error;
-    
+    use base58::FromBase58; // Added missing import
+
     const EXTENDED_DERIVATIONPATH : &str = "m/44/0/0/[0:70-105;1:30;2:0,1,2,3,4,5,6,7;3:0;4':35;5H:55;6h:66]";
 
     #[test]
@@ -319,6 +320,185 @@ mod tests {
         validate_address(Network::Mainnet, valid_mainnet)?;
         validate_address(Network::Testnet, valid_testnet)?;
         assert!(validate_address(Network::Mainnet, valid_testnet).is_err());
+        Ok(())
+    }
+
+    ////
+    #[test]
+    fn test_get_unused_address() -> Result<(), Error> {
+        // Mock inputs
+        let extended_key = "xprv9s21ZrQH143K3XVnYZ9RtEiFWodPvMz3SCRt8nWzTx6zS9mJfTpLStJrNa2Bd9v8kwFdDJkWizK62FBmRGDW8MEZciMBzw3zMwZcXophEF6"; // xpriv, no xpub
+        let extended_derivation_path = "m/44'/0'/0'/[0:70-105;1:30;2:0,1,2,3,4,5,6,7;3:0;]";
+        let shorted_derivation_path = "path/[0:70-105;1:30;2:0,1,2,3,4,5,6,7;3:0;]";
+        let type_index = "0";
+        let gap_limit = 20;
+
+        // Test case 1: pk_or_bitcoin_address = true (returns hex-encoded public key)
+        {
+            let result = get_unused_address(
+                extended_key,
+                extended_derivation_path,
+                type_index,
+                Network::Mainnet,
+                gap_limit,
+                true, // Return hex-encoded public key
+            )?;
+            // Verify the result is a valid hex string
+            assert!(
+                hex::decode(&result).is_ok(),
+                "Public key should be a valid hex string"
+            );
+            // Compressed public key should be 66 characters (33 bytes * 2 for hex)
+            assert_eq!(
+                result.len(),
+                66,
+                "Public key should be 66 characters (compressed key)"
+            );
+            // Check if it starts with "02" or "03" (compressed public key prefix)
+            assert!(
+                result.starts_with("02") || result.starts_with("03"),
+                "Public key should start with '02' or '03' for compressed key"
+            );
+
+            println!("Mainnet Compressed Public Key {}", result);
+        }
+
+        // Test case 2: pk_or_bitcoin_address = false (returns Mainnet P2PKH address)
+        {
+            let result = get_unused_address(
+                extended_key,
+                extended_derivation_path,
+                type_index,
+                Network::Mainnet,
+                gap_limit,
+                false, // Return P2PKH address
+            )?;
+            // Verify the address is valid Base58Check
+            let decoded = result
+                .from_base58()
+                .map_err(|e| Error::FromBase58Error(e))?;
+            assert_eq!(
+                decoded.len(),
+                25,
+                "P2PKH address should decode to 25 bytes"
+            );
+            // Use decode_address to validate checksum and version
+            let (version, _) = decode_address(&result)?;
+            // Check version byte matches Mainnet P2PKH
+            assert_eq!(
+                version,
+                constants::MAINNET_P2PKH_VERSION,
+                "Address version should match Mainnet P2PKH"
+            );
+            // Check address starts with '1' for Mainnet P2PKH
+            assert!(
+                result.starts_with("1"),
+                "Mainnet P2PKH address should start with '1'"
+            );
+
+            println!("Mainnet P2PKH address {}", result);
+        }
+
+        // Test case 3: Testnet address (pk_or_bitcoin_address = false)
+        // {
+        //     let result = get_unused_address(
+        //         extended_key,
+        //         extended_derivation_path,
+        //         type_index,
+        //         Network::Testnet,
+        //         gap_limit,
+        //         false, // Return P2PKH address
+        //     )?;
+        //     // Verify the address is valid Base58Check
+        //     let decoded = result
+        //         .from_base58()
+        //         .map_err(|e| Error::FromBase58Error(e))?;
+        //     assert_eq!(
+        //         decoded.len(),
+        //         25,
+        //         "P2PKH address should decode to 25 bytes"
+        //     );
+        //     // Use decode_address to validate checksum and version
+        //     let (version, _) = decode_address(&result)?;
+        //     // Check version byte matches Testnet P2PKH
+        //     assert_eq!(
+        //         version,
+        //         constants::TESTNET_P2PKH_VERSION,
+        //         "Address version should match Testnet P2PKH"
+        //     );
+        //     // Check address starts with 'm' or 'n' for Testnet P2PKH
+        //     assert!(
+        //         result.starts_with("m") || result.starts_with("n"),
+        //         "Testnet P2PKH address should start with 'm' or 'n'"
+        //     );
+        // }
+
+        // Test case 1.path: pk_or_bitcoin_address = true (returns hex-encoded public key)
+        {
+            let result = get_unused_address(
+                extended_key,
+                shorted_derivation_path,
+                type_index,
+                Network::Mainnet,
+                gap_limit,
+                true, // Return hex-encoded public key
+            )?;
+            // Verify the result is a valid hex string
+            assert!(
+                hex::decode(&result).is_ok(),
+                "Public key should be a valid hex string"
+            );
+            // Compressed public key should be 66 characters (33 bytes * 2 for hex)
+            assert_eq!(
+                result.len(),
+                66,
+                "Public key should be 66 characters (compressed key)"
+            );
+            // Check if it starts with "02" or "03" (compressed public key prefix)
+            assert!(
+                result.starts_with("02") || result.starts_with("03"),
+                "Public key should start with '02' or '03' for compressed key"
+            );
+
+            println!("Mainnet Compressed Public Key {}", result);
+        }
+
+        // Test case 2.path: pk_or_bitcoin_address = false (returns Mainnet P2PKH address)
+        {
+            let result = get_unused_address(
+                extended_key,
+                shorted_derivation_path,
+                type_index,
+                Network::Mainnet,
+                gap_limit,
+                false, // Return P2PKH address
+            )?;
+            // Verify the address is valid Base58Check
+            let decoded = result
+                .from_base58()
+                .map_err(|e| Error::FromBase58Error(e))?;
+            assert_eq!(
+                decoded.len(),
+                25,
+                "P2PKH address should decode to 25 bytes"
+            );
+            // Use decode_address to validate checksum and version
+            let (version, _) = decode_address(&result)?;
+            // Check version byte matches Mainnet P2PKH
+            assert_eq!(
+                version,
+                constants::MAINNET_P2PKH_VERSION,
+                "Address version should match Mainnet P2PKH"
+            );
+            // Check address starts with '1' for Mainnet P2PKH
+            assert!(
+                result.starts_with("1"),
+                "Mainnet P2PKH address should start with '1'"
+            );
+
+            println!("Mainnet P2PKH address {}", result);
+        }
+
         Ok(())
     }
 }

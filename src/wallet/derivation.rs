@@ -423,12 +423,19 @@ pub fn derive_seed_or_extended_key(
     let mut parent_fingerprint: [u8; 4] = [0; 4];
 
     // Normalize path: convert "m" or Empty String into to "m/" else add / at the end if not
-    let normalized_path = if path.is_empty() {
+    let normalized_path_2 = if path.is_empty() {
         format!("m/")
     } else if !path.ends_with('/') {
         format!("{}/", path)
     } else {
         path.to_string()
+    };
+
+    // Convert path starting with "path" to start with "m"
+    let normalized_path = if normalized_path_2.starts_with("path") {
+        format!("m{}", &normalized_path_2[4..])
+    } else {
+        normalized_path_2.clone()
     };
 
     // Validate path
