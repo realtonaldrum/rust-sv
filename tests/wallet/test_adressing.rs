@@ -230,6 +230,63 @@ mod tests {
 
     }
 
+    ///  
+    const EXTENDED_KEY : &str = "xprv9s21ZrQH143K3XVnYZ9RtEiFWodPvMz3SCRt8nWzTx6zS9mJfTpLStJrNa2Bd9v8kwFdDJkWizK62FBmRGDW8MEZciMBzw3zMwZcXophEF6";
+    const ADVANCED_EXTENDED_DERIVATIONPATH : &str = "m/69'/0'/0'/[0:70-105,90-120,88,69,70-75;]";
+    const TYPEINDEX : &str = "0";
+    const NETWORK : Network = Network::Mainnet;
+
+    #[test]
+    fn test_get_adresse_array_from_extended_derivationpath() {
+
+        // Get the result from the function being tested
+        let result = get_adresse_array_from_extended_derivationpath(
+            EXTENDED_KEY,
+            ADVANCED_EXTENDED_DERIVATIONPATH,
+            TYPEINDEX,
+            NETWORK,
+        );
+
+        // Get public keys for comparison
+        let compare_pk = get_publickey_array_from_extended_derivationpath(
+            EXTENDED_KEY,
+            ADVANCED_EXTENDED_DERIVATIONPATH,
+            TYPEINDEX,
+            NETWORK,
+        );
+
+        // Convert public keys to P2PKH addresses
+        let compare_adresse = match compare_pk {
+            Ok(pubkeys) => pubkeys
+                .into_iter()
+                .map(|pubkey_hex| {
+                    // Decode hex-encoded public key
+                    let pubkey_bytes = hex::decode(pubkey_hex)?;
+                    // Generate P2PKH address
+                    public_key_to_p2pkh_address(&pubkey_bytes, NETWORK)
+                })
+                .collect::<Result<Vec<String>, _>>(),
+            Err(e) => Err(e),
+        };
+
+        println!(
+            "test_get_address_array_from_extended_derivationpath - Result: {:?}",
+            result
+        );
+
+        match (result, compare_adresse) {
+            (Ok(value), Ok(compare)) => assert_eq!(
+                value,
+                compare,
+                "Parsing typeindex {} failed",
+                TYPEINDEX
+            ),
+            (Err(e), _) => panic!("Parsing typeindex {} failed: {:?}", TYPEINDEX, e),
+            (_, Err(e)) => panic!("Comparison address derivation failed: {:?}", e),
+        }
+    }
+
+    //////
     #[test]
     fn test_encode_decode_p2pkh() -> Result<(), Error> {
         let pubkey_hash: [u8; 20] = hex::decode("1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b")?

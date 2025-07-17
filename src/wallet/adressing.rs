@@ -143,7 +143,6 @@ pub fn get_indexes_in_array(typeindex_content: &str) -> Result<Vec<usize>> {
     Ok(indices)
 }
 
-
 pub fn get_typeindex_indices(extended_derivationpath: &str, typeindex: &str) -> Result<Vec<usize>> {
     let bracket_content = extract_brackets(extended_derivationpath)
         .ok_or_else(|| Error::BadData("Failed to extract brackets".to_string()))?;
@@ -209,8 +208,49 @@ pub fn validate_address(network: Network, address: &str) -> Result<()> {
     Ok(())
 }
 
+
+pub fn get_publickey_array_from_extended_derivationpath(
+    extended_key: &str,
+    extended_derivationpath: &str,
+    typeindex: &str,
+    network: Network,
+) -> Result<Vec<String>> {
+
+
+    // Get the indices for the given typeindex
+    let indices = get_typeindex_indices(extended_derivationpath, typeindex)?;
+
+    // Extract the base path (e.g., m/69'/0'/0')
+    let base_path = exclude_brackets(extended_derivationpath);
+
+    println!("Works with: {:?} and {:?} and {:?}", base_path, typeindex,  indices);
+
+    // Derive addresses for each index
+    let addresses: Result<Vec<String>> = indices.into_iter().map(|index| {
+        // Construct the full derivation path for the child (e.g., m/69'/0'/0'/index)
+        let child_path = format!("{}/{}/{}", base_path, typeindex, index);
+        
+        // Derive the child key using derive_seed_or_extended_key
+        let child_keypair = derive_seed_or_extended_key(extended_key, &child_path, network)?;
+        
+        // Extract the public key from the extended public key
+        let extended_key_obj = ExtendedKey::decode(&child_keypair.extended_public_key)?;
+        let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+        let public_key_bytes = bip32_key.get_public_key();
+        
+        // Get Public Key
+        // Convert public key bytes to Hex-encoded public key
+        let address = hex::encode(public_key_bytes);
+        Ok(address)
+    }).collect();
+
+    addresses
+}
+
+
+
 // Custom function to generate P2PKH address from a public key using encode_p2pkh_address
-fn public_key_to_p2pkh_address(pubkey: &[u8], network: Network) -> Result<String> {
+pub fn public_key_to_p2pkh_address(pubkey: &[u8], network: Network) -> Result<String> {
     // Step 1: SHA-256 hash of the public key
     let sha256_hash = Sha256::digest(pubkey);
     
@@ -221,7 +261,7 @@ fn public_key_to_p2pkh_address(pubkey: &[u8], network: Network) -> Result<String
     encode_p2pkh_address(network, &pubkey_hash)
 }
 
-pub fn get_addresses_with_derivation(
+pub fn get_adresse_array_from_extended_derivationpath(
     extended_key: &str,
     extended_derivationpath: &str,
     typeindex: &str,
