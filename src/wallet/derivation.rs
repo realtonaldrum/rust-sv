@@ -1,4 +1,4 @@
-// Implements BIP32 and BIP39
+// Implements BIP32
 
 pub use ring::hmac as ring_hmac;
 pub use sha2::{Digest, Sha256};
