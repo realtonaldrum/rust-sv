@@ -3,9 +3,12 @@ mod tests {
     use rustsv::wallet::derivation::*;
     use rustsv::util::Error;
     
-    const SEED: &str = "e5dfcbe3c62fb5e4d7dbb794119fcd9a8fbaeed04b841ad6a3d4652b2e211f370e75dc1f71a61cb6027ff360bf7826272541c0724beff9bd6c358a046497449c";
-    const EXPECTED_MASTER_PRIV: &str = "xprv9s21ZrQH143K3XVnYZ9RtEiFWodPvMz3SCRt8nWzTx6zS9mJfTpLStJrNa2Bd9v8kwFdDJkWizK62FBmRGDW8MEZciMBzw3zMwZcXophEF6";
+    const SEED: &str = "697fce933855df6dc5f0490c8370157af5af4af1b5f20d5c6ec7f5c1d04b859e2389bdf68fd956fd9dede46d9aa9af114b23cec6a69c8905e84c2e6376e19eb7";
+    const EXPECTED_MASTER_PRIV: &str = "xprv9s21ZrQH143K4aC15QhGLbgXYMdLskEFQ3rJ8ucq8uPE5zqoih5rSUWALU2CrgbGAQxiApmw6tE3DUgm7G2Ns2CPusPkfNKLJE7LX9TVoTs";
     // const EXPECTED_MASTER_PUB: &str = "xpub661MyMwAqRbcG1aFeagSFNez4qTtKphtoRMUwAvc2HdyJx6TD18azgdLDqNQNxxb9So1MEfG8oRn2ryuzCB4GFt87Lhh5wWy9r5g6xEVdrD";
+
+    /// You need to know the derivation path from the master xpriv for this
+    const EXPECTED_CHILD_PRIV : &str = "xprv9zPYpnKVEEdo5PJuiPNM3LjjZuJqnUd5CQ14MHr7aa26GWHDQpua1HMyJsnWg3unmmsBEQwDQPMfkDB3TtaNM6Ao4G5dGJzZzDYMWFe33LW";
 
     #[test]
     fn test_master_xpriv_from_seed()  -> Result<(), Error> {
@@ -99,7 +102,6 @@ mod tests {
     fn test_unusual_but_valid_path_writings()  -> Result<(), Error> {
         let master_keypair = derive_seed_or_extended_key(SEED, "", Network::Mainnet)?;
         let derived_keypair = derive_seed_or_extended_key(EXPECTED_MASTER_PRIV, "m/44/0/0/", Network::Mainnet)?;
-        let expected_encoded = "xprv9zQBrJrMTvL2moMyWteT2YcUr5cad7RUUkXtgWyMpGStCCQq1EDXDU8YmnRUrxxx59TKKx4wEuSmS1Fm7QPBHxoAM7SFRG5H1A5xTeEi4Yw"; // Replace with actual derived xprv
 
         println!("Master  Keypair: {:?}", master_keypair);
         println!("Child   Keypair: {:?}", derived_keypair);
@@ -111,7 +113,7 @@ mod tests {
         );
         assert_eq!(
             derived_keypair.extended_private_key,
-            expected_encoded,
+            EXPECTED_CHILD_PRIV,
             "Derived key does not match expected value"
         );
         assert!(
@@ -174,9 +176,9 @@ mod tests {
         let derived = derive_seed_or_extended_key(&m_44_0.extended_private_key, "m/0", Network::Mainnet)?;
         println!("m/44/0/0 xprv: {}", derived.extended_private_key);
 
-        let correct_expected_derived = "xprv9zQBrJrMTvL2moMyWteT2YcUr5cad7RUUkXtgWyMpGStCCQq1EDXDU8YmnRUrxxx59TKKx4wEuSmS1Fm7QPBHxoAM7SFRG5H1A5xTeEi4Yw";
+        // let correct_expected_derived = "xprv9zPYpnKVEEdo5PJuiPNM3LjjZuJqnUd5CQ14MHr7aa26GWHDQpua1HMyJsnWg3unmmsBEQwDQPMfkDB3TtaNM6Ao4G5dGJzZzDYMWFe33LW";
         // let uncorrect_expected_derived = "xprv9zKZ4Ycu1DUYWyJqPZLh9ZYiZs3K5kpvRHXoJCUSwNFwwKVbUVH5WNUg1SJdKJxFWo9X2KGBBhJXdNecQANJAidRXrN8Mju8LzQf4KmbebU";
-        assert_eq!(derived.extended_private_key, correct_expected_derived, "Derived key mismatch");
+        assert_eq!(derived.extended_private_key, EXPECTED_CHILD_PRIV, "Derived key mismatch");
         Ok(())
     }
 
