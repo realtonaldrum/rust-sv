@@ -13,7 +13,7 @@ pub const COINBASE_OUTPOINT_INDEX: u32 = 0xffffffff;
 pub struct OutPoint {
     /// Hash of the referenced transaction
     pub hash: Hash256,
-    /// Index of the output in the transaction, zero-indexed
+    /// Index of the output in the transaction, zero-indexed aka. vout
     pub index: u32,
 }
 

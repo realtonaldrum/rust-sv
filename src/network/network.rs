@@ -27,12 +27,10 @@ impl NetworkConfig {
         let seeds = match network {
             Network::Mainnet => vec![
                 "seed.bitcoinsv.io".to_string(),
-                "seed.cascharia.com".to_string(),
                 "seed.satoshisvision.network".to_string(),
             ],
             Network::Testnet => vec![
                 "testnet-seed.bitcoinsv.io".to_string(),
-                "testnet-seed.cascharia.com".to_string(),
                 "testnet-seed.bitcoincloud.net".to_string(),
             ],
             Network::STN => vec!["stn-seed.bitcoinsv.io".to_string()],
@@ -98,7 +96,7 @@ impl NetworkConfig {
                         satoshis: 5000000000,
                         lock_script: Script(hex::decode("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
                     }],
-                    lock_time: 0,
+                    locktime: 0,
                 };
                 Block {
                     header,
@@ -131,7 +129,7 @@ impl NetworkConfig {
                         satoshis: 5000000000,
                         lock_script: Script(hex::decode("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac").unwrap()),
                     }],
-                    lock_time: 0,
+                    locktime: 0,
                 };
                 Block {
                     header,
@@ -179,7 +177,7 @@ impl NetworkConfig {
     }
 
     /// Creates a new DNS seed iterator
-    pub fn seed_iter(&self) -> SeedIter {
+    pub fn seed_iter(&'_ self) -> SeedIter<'_> {
         SeedIter::new(self.seeds(), self.port())
     }
 }

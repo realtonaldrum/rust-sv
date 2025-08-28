@@ -34,7 +34,7 @@ pub struct TransactionChecker<'a> {
     pub tx: &'a Tx,
     pub sig_hash_cache: &'a mut SigHashCache,
     pub input: usize,
-    pub satoshis: i64,
+    pub satoshis: u64,
     pub require_sighash_forkid: bool,
 }
 
@@ -68,12 +68,12 @@ impl<'a> Checker for TransactionChecker<'a> {
         if locktime < 0 {
             return Err(Error::ScriptError("locktime negative".to_string()));
         }
-        if (locktime >= LOCKTIME_THRESHOLD && (self.tx.lock_time as i32) < LOCKTIME_THRESHOLD)
-            || (locktime < LOCKTIME_THRESHOLD && (self.tx.lock_time as i32) >= LOCKTIME_THRESHOLD)
+        if (locktime >= LOCKTIME_THRESHOLD && (self.tx.locktime as i32) < LOCKTIME_THRESHOLD)
+            || (locktime < LOCKTIME_THRESHOLD && (self.tx.locktime as i32) >= LOCKTIME_THRESHOLD)
         {
             return Err(Error::ScriptError("locktime types different".to_string()));
         }
-        if locktime > self.tx.lock_time as i32 {
+        if locktime > self.tx.locktime as i32 {
             return Err(Error::ScriptError("locktime greater than tx".to_string()));
         }
         if self.tx.inputs[self.input].sequence == 0xffffffff {
@@ -155,7 +155,7 @@ mod tests {
                 satoshis: 10,
                 lock_script,
             }],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut tx_2 = Tx {
@@ -169,13 +169,13 @@ mod tests {
                 sequence: 0xffffffff,
             }],
             outputs: vec![],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut cache = SigHashCache::new();
         let lock_script = &tx_1.outputs[0].lock_script.0;
         let sig_hash = sighash(&tx_2, 0, lock_script, 10, sighash_type, &mut cache).unwrap();
-        let sig = generate_signature(&private_key, &sig_hash, sighash_type).unwrap();
+        let sig = generate_signature(private_key, &sig_hash, sighash_type).unwrap();
 
         let mut unlock_script = Script::new();
         unlock_script.append_data(&sig);
@@ -231,7 +231,7 @@ mod tests {
                 satoshis: 10,
                 lock_script,
             }],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut tx_2 = Tx {
@@ -245,14 +245,14 @@ mod tests {
                 sequence: 0xffffffff,
             }],
             outputs: vec![],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut cache = SigHashCache::new();
         let lock_script = &tx_1.outputs[0].lock_script.0;
         let sig_hash = sighash(&tx_2, 0, lock_script, 10, sighash_type, &mut cache).unwrap();
-        let sig1 = generate_signature(&private_key1, &sig_hash, sighash_type).unwrap();
-        let sig3 = generate_signature(&private_key3, &sig_hash, sighash_type).unwrap();
+        let sig1 = generate_signature(private_key1, &sig_hash, sighash_type).unwrap();
+        let sig3 = generate_signature(private_key3, &sig_hash, sighash_type).unwrap();
 
         let mut unlock_script = Script::new();
         unlock_script.append(OP_0);
@@ -322,7 +322,7 @@ mod tests {
                     lock_script: lock_script2,
                 },
             ],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut tx_2 = Tx {
@@ -336,7 +336,7 @@ mod tests {
                 sequence: 0xffffffff,
             }],
             outputs: vec![],
-            lock_time: 0,
+            locktime: 0,
         };
 
         // Sign the first input
@@ -344,7 +344,7 @@ mod tests {
         let mut cache = SigHashCache::new();
         let lock_script = &tx_1.outputs[0].lock_script.0;
         let sig_hash1 = sighash(&tx_2, 0, lock_script, 10, sighash_type, &mut cache).unwrap();
-        let sig1 = generate_signature(&private_key1, &sig_hash1, sighash_type).unwrap();
+        let sig1 = generate_signature(private_key1, &sig_hash1, sighash_type).unwrap();
 
         let mut unlock_script1 = Script::new();
         unlock_script1.append_data(&sig1);
@@ -366,7 +366,7 @@ mod tests {
         let lock_script = &tx_1.outputs[1].lock_script.0;
 
         let sig_hash2 = sighash(&tx_2, 1, lock_script, 20, sighash_type, &mut cache).unwrap();
-        let sig2 = generate_signature(&private_key2, &sig_hash2, sighash_type).unwrap();
+        let sig2 = generate_signature(private_key2, &sig_hash2, sighash_type).unwrap();
 
         let mut unlock_script2 = Script::new();
         unlock_script2.append_data(&sig2);
@@ -450,7 +450,7 @@ mod tests {
                     lock_script: lock_script2.clone(),
                 },
             ],
-            lock_time: 0,
+            locktime: 0,
         };
 
         let mut tx_2 = Tx {
@@ -467,7 +467,7 @@ mod tests {
                 satoshis: 10,
                 lock_script: lock_script1.clone(),
             }],
-            lock_time: 0,
+            locktime: 0,
         };
 
         // Sign the first input and output
@@ -475,7 +475,7 @@ mod tests {
         let mut cache = SigHashCache::new();
         let lock_script = &tx_1.outputs[0].lock_script.0;
         let sig_hash1 = sighash(&tx_2, 0, lock_script, 10, sighash_type, &mut cache).unwrap();
-        let sig1 = generate_signature(&private_key1, &sig_hash1, sighash_type).unwrap();
+        let sig1 = generate_signature(private_key1, &sig_hash1, sighash_type).unwrap();
 
         let mut unlock_script1 = Script::new();
         unlock_script1.append_data(&sig1);
@@ -507,7 +507,7 @@ mod tests {
             &mut cache,
         )
         .unwrap();
-        let sig2 = generate_signature(&private_key2, &sig_hash2, sighash_type).unwrap();
+        let sig2 = generate_signature(private_key2, &sig_hash2, sighash_type).unwrap();
 
         let mut unlock_script2 = Script::new();
         unlock_script2.append_data(&sig2);
@@ -562,7 +562,7 @@ mod tests {
                 sequence: 0,
             }],
             outputs: vec![],
-            lock_time: 499,
+            locktime: 499,
         };
         {
             let mut cache = SigHashCache::new();
@@ -576,7 +576,7 @@ mod tests {
             assert!(lock_script.eval(&mut c, PREGENESIS_RULES).is_err());
         }
         {
-            tx.lock_time = 500;
+            tx.locktime = 500;
             let mut cache = SigHashCache::new();
             let mut c = TransactionChecker {
                 tx: &tx,
@@ -608,7 +608,7 @@ mod tests {
                 sequence: 499 | SEQUENCE_LOCKTIME_TYPE_FLAG,
             }],
             outputs: vec![],
-            lock_time: 0,
+            locktime: 0,
         };
         {
             let mut cache = SigHashCache::new();

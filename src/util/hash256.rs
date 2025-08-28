@@ -28,8 +28,8 @@ impl Hash256 {
             let msg = format!("Length {} of {:?}", decoded_bytes.len(), decoded_bytes);
             return Err(Error::BadArgument(msg));
         }
-        hash_bytes.clone_from_slice(&decoded_bytes);
-        hash_bytes.reverse();
+        // Convert big-endian to little-endian
+        hash_bytes.copy_from_slice(&decoded_bytes.iter().rev().copied().collect::<Vec<u8>>()); 
         Ok(Hash256(hash_bytes))
     }
 }

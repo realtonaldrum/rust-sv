@@ -15,6 +15,7 @@ pub enum Error {
     BadData(String),
     /// BIP-32 specific error
     Bip32Error(String),
+    FeeValidationError { actual_fee: u64, min_fee: u64, shortfall: u64 },
     /// Base58 string could not be decoded
     FromBase58Error(FromBase58Error),
     /// Hex string could not be decoded
@@ -23,6 +24,10 @@ pub enum Error {
     FromUtf8Error(FromUtf8Error),
     /// The state is not valid
     IllegalState(String),
+    /// Insufficient funds for the operation
+    InsufficientFunds(u64, u64), // (available, required)
+    /// Insufficient funds for the fees operation
+    InsufficientFundsForFee(u64, u64, u64), // (available, required, fee)
     /// The operation is not valid on this object
     InvalidOperation(String),
     /// Standard library IO error
@@ -37,6 +42,8 @@ pub enum Error {
     Timeout,
     /// An unknown error in the Ring library
     UnspecifiedRingError,
+    /// HTTP error
+    Http(String),
     /// The data or functionality is not supported by this library
     Unsupported(String),
 }
@@ -47,16 +54,22 @@ impl std::fmt::Display for Error {
             Error::BadArgument(s) => f.write_str(&format!("Bad argument: {}", s)),
             Error::BadData(s) => f.write_str(&format!("Bad data: {}", s)),
             Error::Bip32Error(s) => f.write_str(&format!("BIP-32 error: {}", s)),
+            Error::FeeValidationError { actual_fee, min_fee, shortfall } => {
+                f.write_str(&format!("Fee validation failed: actual_fee {} < min_fee {}, shortfall {}", actual_fee, min_fee, shortfall))
+            }
             Error::FromBase58Error(e) => f.write_str(&format!("Base58 decoding error: {:?}", e)), // Changed {} to {:?}
             Error::FromHexError(e) => f.write_str(&format!("Hex decoding error: {}", e)),
             Error::FromUtf8Error(e) => f.write_str(&format!("Utf8 parsing error: {}", e)),
             Error::IllegalState(s) => f.write_str(&format!("Illegal state: {}", s)),
+            Error::InsufficientFunds(total_satoshi, output_satoshi) => f.write_str(&format!("Insufficient funds. Total:{} < Output: {}", total_satoshi, output_satoshi)),
+            Error::InsufficientFundsForFee(total_satoshi, output_satoshi, fee) => f.write_str(&format!("Insufficient funds for fee: {} < {} + {}", total_satoshi, output_satoshi, fee)),
             Error::InvalidOperation(s) => f.write_str(&format!("Invalid operation: {}", s)),
             Error::IOError(e) => f.write_str(&format!("IO error: {}", e)),
             Error::ParseIntError(e) => f.write_str(&format!("ParseIntError: {}", e)),
             Error::ScriptError(s) => f.write_str(&format!("Script error: {}", s)),
             Error::Secp256k1Error(e) => f.write_str(&format!("Secp256k1 error: {}", e)),
             Error::Timeout => f.write_str("Timeout"),
+            Error::Http(s) => f.write_str(&format!("HTTP error: {}", s)),
             Error::UnspecifiedRingError => f.write_str("Unspecified ring error"),
             Error::Unsupported(s) => f.write_str(&format!("Unsupported: {}", s)),
         }

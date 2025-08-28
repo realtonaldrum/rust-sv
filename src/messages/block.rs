@@ -227,7 +227,7 @@ mod tests {
                                 252, 174, 65, 42, 227, 49, 107, 119, 172,
                             ]),
                         }],
-                        lock_time: 0,
+                        locktime: 0,
                     }],
                 }
         );
@@ -265,7 +265,7 @@ mod tests {
                     satoshis: 23,
                     lock_script: Script(vec![1, 2, 3, 4, 5]),
                 }],
-                lock_time: 4,
+                locktime: 4,
             }],
         };
         block.write(&mut v).unwrap();

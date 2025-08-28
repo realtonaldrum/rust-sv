@@ -6,6 +6,15 @@ use std::fmt;
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hash160(pub [u8; 20]);
 
+/// Transform a public key into a 20-byte hash, which serves as the core component 
+/// of a Bitcoin address and the scriptPubKey in a P2PKH transaction.
+/// Cannot be converted back - SHA-256 and RIPEMD-160 are one-way hash functions
+/// The infeasibility of reversing hash160 is a key security feature of P2PKH. 
+/// It ensures that an attacker cannot derive the public key 
+/// from the pubkey_hash (or the Bitcoin address) alone.
+/// The public key is only revealed when the UTXO is spent (via the scriptSig),
+/// which enhances privacy for unspent outputs.
+
 pub fn hash160(data: &[u8]) -> Hash160 {
     let sha256 = digest(&SHA256, data);
     let mut ripemd160 = Ripemd160::new();

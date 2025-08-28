@@ -37,7 +37,7 @@ pub fn sighash(
     tx: &Tx,
     n_input: usize,
     script_code: &[u8],
-    satoshis: i64,
+    satoshis: u64,
     sighash_type: u8,
     cache: &mut SigHashCache,
 ) -> Result<Hash256> {
@@ -76,7 +76,7 @@ fn bip143_sighash(
     tx: &Tx,
     n_input: usize,
     script_code: &[u8],
-    satoshis: i64,
+    satoshis: u64,
     sighash_type: u8,
     cache: &mut SigHashCache,
 ) -> Result<Hash256> {
@@ -127,7 +127,7 @@ fn bip143_sighash(
     s.write(&script_code)?;
 
     // 6. Serialize satoshis
-    s.write_i64::<LittleEndian>(satoshis)?;
+    s.write_u64::<LittleEndian>(satoshis)?;
 
     // 7. Serialize sequence
     s.write_u32::<LittleEndian>(tx.inputs[n_input].sequence)?;
@@ -154,8 +154,8 @@ fn bip143_sighash(
         s.write(&[0; 32])?;
     }
 
-    // 9. Serialize lock_time
-    s.write_u32::<LittleEndian>(tx.lock_time)?;
+    // 9. Serialize locktime
+    s.write_u32::<LittleEndian>(tx.locktime)?;
 
     // 10. Serialize hash type
     s.write_u32::<LittleEndian>((FORK_ID << 8) | sighash_type as u32)?;
@@ -166,6 +166,8 @@ fn bip143_sighash(
 /// Generates the transaction digest for signing using the legacy algorithm
 ///
 /// This is used for all transaction validation before the August 2017 fork.
+/// Replaces satoshi = -1 with Satoshi 0 wegen i64 zu u64 type convertion für empty cases
+
 fn legacy_sighash(
     tx: &Tx,
     n_input: usize,
@@ -232,7 +234,7 @@ fn legacy_sighash(
     for i in 0..tx_out_list.len() {
         if i == n_input && base_type == SIGHASH_SINGLE {
             let empty = TxOut {
-                satoshis: -1,
+                satoshis: 0,
                 lock_script: Script(vec![]),
             };
             empty.write(&mut s)?;
@@ -242,7 +244,7 @@ fn legacy_sighash(
     }
 
     // Serialize the lock time
-    s.write_u32::<LittleEndian>(tx.lock_time)?;
+    s.write_u32::<LittleEndian>(tx.locktime)?;
 
     // Append the sighash_type and finally double hash the result
     s.write_u32::<LittleEndian>(sighash_type as u32)?;
@@ -285,7 +287,7 @@ mod tests {
                     lock_script: p2pkh::create_lock_script(&hash160_array.into()),
                 },
             ],
-            lock_time: 0,
+            locktime: 0,
         };
         let mut cache = SigHashCache::new();
         let sighash_type = SIGHASH_ALL | SIGHASH_FORKID;
@@ -317,7 +319,7 @@ mod tests {
                 satoshis: 49990000,
                 lock_script: Script(hex::decode("76a9147865b0b301119fc3eadc7f3406ff1339908e46d488ac")?.into()),
             }],
-            lock_time: 0,
+            locktime: 0,
         };
         let sighash = legacy_sighash(&tx, 0, &lock_script, SIGHASH_ALL)?;
         let expected = "ad16084eccf26464a84c5ee2f8b96b4daff9a3154ac3c1b320346aed042abe57";

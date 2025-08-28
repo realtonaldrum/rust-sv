@@ -1,9 +1,8 @@
-#![allow(deprecated)]
-
 use dns_lookup::lookup_host;
 use log::{error, info};
-use rand::{thread_rng, Rng}; // Added Rng
+use rand::{rng, seq::SliceRandom};
 use std::net::IpAddr;
+use rand::Rng;
 
 #[derive(Clone, Debug)]
 pub struct SeedIter<'a> {
@@ -17,9 +16,9 @@ pub struct SeedIter<'a> {
 
 impl<'a> SeedIter<'a> {
     pub fn new(seeds: &'a [String], port: u16) -> Self {
-        let mut rng = thread_rng();
-        let random_offset = rng.gen_range(0..100); // Already fixed
-        Self {
+        let mut rng = rng();
+        let random_offset = rng.random_range(0..100);
+        SeedIter {
             port,
             seeds,
             nodes: Vec::new(),
@@ -34,21 +33,21 @@ impl<'a> Iterator for SeedIter<'a> {
     type Item = (IpAddr, u16);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.seed_index >= self.seeds.len() {
-                return None;
-            }
+        while self.seed_index < self.seeds.len() {
             if self.nodes.is_empty() {
                 let i = (self.seed_index + self.random_offset) % self.seeds.len();
                 info!("Looking up DNS: {}", self.seeds[i]);
                 match lookup_host(&self.seeds[i]) {
-                    Ok(ip_list) => {
-                        if ip_list.is_empty() {
+                    Ok(ip_iter) => {
+                        let mut ip_vec: Vec<IpAddr> = ip_iter.into_iter().collect();
+                        if ip_vec.is_empty() {
                             error!("DNS lookup for {} returned no IPs", self.seeds[i]);
                             self.seed_index += 1;
                             continue;
                         }
-                        self.nodes = ip_list;
+                        ip_vec.shuffle(&mut rng());
+                        self.nodes = ip_vec;
+                        self.node_index = 0;
                     }
                     Err(e) => {
                         error!("Failed to look up DNS {}: {}", self.seeds[i], e);
@@ -57,15 +56,22 @@ impl<'a> Iterator for SeedIter<'a> {
                     }
                 }
             }
-            let i = (self.node_index + self.random_offset) % self.nodes.len();
-            self.node_index += 1;
-            if self.node_index >= self.nodes.len() {
-                self.node_index = 0;
-                self.seed_index += 1;
+            if self.node_index < self.nodes.len() {
+                let ip = self.nodes[self.node_index];
+                self.node_index += 1;
+                if self.node_index >= self.nodes.len() {
+                    self.nodes.clear();
+                    self.seed_index += 1;
+                    self.node_index = 0;
+                }
+                return Some((ip, self.port));
+            } else {
                 self.nodes.clear();
+                self.seed_index += 1;
+                self.node_index = 0;
             }
-            return Some((self.nodes[i], self.port));
         }
+        None
     }
 }
 

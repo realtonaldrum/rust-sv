@@ -8,7 +8,7 @@ use std::io::{Read, Write};
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TxOut {
     /// Number of satoshis to spend
-    pub satoshis: i64,
+    pub satoshis: u64,
     /// Public key script to claim the output
     pub lock_script: Script,
 }
@@ -22,7 +22,7 @@ impl TxOut {
 
 impl Serializable<TxOut> for TxOut {
     fn read(reader: &mut dyn Read) -> Result<TxOut> {
-        let satoshis = reader.read_i64::<LittleEndian>()?;
+        let satoshis = reader.read_u64::<LittleEndian>()?;
         let script_len = var_int::read(reader)?;
         let mut lock_script = Script(vec![0; script_len as usize]);
         reader.read(&mut lock_script.0)?;
@@ -33,7 +33,7 @@ impl Serializable<TxOut> for TxOut {
     }
 
     fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
-        writer.write_i64::<LittleEndian>(self.satoshis)?;
+        writer.write_u64::<LittleEndian>(self.satoshis)?;
         var_int::write(self.lock_script.0.len() as u64, writer)?;
         writer.write(&self.lock_script.0)?;
         Ok(())

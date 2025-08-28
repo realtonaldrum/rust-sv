@@ -534,7 +534,7 @@ mod tests {
                         satoshis: 42,
                         lock_script: Script(vec![9; 21]),
                     }],
-                    lock_time: 0x12ff34aa,
+                    locktime: 0x12ff34aa,
                 },
                 Tx {
                     version: 0x99881122,
@@ -550,7 +550,7 @@ mod tests {
                         satoshis: 43,
                         lock_script: Script(vec![10; 22]),
                     }],
-                    lock_time: 0x44550011,
+                    locktime: 0x44550011,
                 },
             ],
         };
@@ -756,7 +756,7 @@ mod tests {
                 satoshis: 42,
                 lock_script: Script(vec![8; 8]),
             }],
-            lock_time: 0x12ff34aa,
+            locktime: 0x12ff34aa,
         };
         let m = Message::Tx(p);
         m.write(&mut v, magic).unwrap();

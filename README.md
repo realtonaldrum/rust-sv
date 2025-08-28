@@ -56,7 +56,7 @@ use rustsv::network::Network;
 use rustsv::util::hash160;
 
 let pubkeyhash = hash160(&[0; 33]);
-let addr = addr_encode(&pubkeyhash, AddressType::P2PKH, Network::Mainnet);
+let addr = addr_encode(&pubkeyhash, TransactionType::P2PKH, Network::Mainnet);
 println!("Address: {}", addr);
 ```
 

@@ -78,6 +78,7 @@ mod send_cmpct;
 mod tx;
 mod tx_in;
 mod tx_out;
+pub mod tx_raw;
 mod version;
 
 pub use self::addr::Addr;

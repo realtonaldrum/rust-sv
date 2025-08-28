@@ -3,19 +3,19 @@
 use std::time::SystemTime;
 
 #[allow(dead_code)]
-pub(crate) mod bits;
+pub mod bits;
 mod bloom_filter;
 #[allow(dead_code)]
 mod future;
 #[allow(dead_code)]
 pub mod hash160;
-mod hash256;
+pub mod hash256;
 #[allow(dead_code)]
 mod latch;
-mod result;
+pub mod result;
 pub mod rx;
 mod serdes;
-pub(crate) mod var_int;
+pub mod var_int;
 
 // Original: pub(crate) use self::bits::{lshift, rshift, Bits};
 pub(crate) use self::bits::{lshift, rshift};
@@ -45,5 +45,3 @@ pub const GENESIS_UPGRADE_HEIGHT_MAINNET: i32 = 620538;
 
 /// Block height that activated the genesis upgrade on testnet
 pub const GENESIS_UPGRADE_HEIGHT_TESTNET: i32 = 1344302;
-
-pub const HARDENED_KEY_OFFSET: u32 = 0x80000000;

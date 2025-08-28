@@ -17,7 +17,10 @@
 //! ```
 
 use crate::script::op_codes::*;
-use crate::util::Result;
+use crate::util::{Result, Error, hash160, sha256d};
+use crate::wallet::adressing::{AddressForm, constants, encode_address, decode_address, TransactionType};
+use crate::network::Network;
+use base58::ToBase58;
 use hex;
 use std::fmt;
 
@@ -92,7 +95,43 @@ impl Script {
 
     /// Evaluates a script using the provided checker
     pub fn eval<T: Checker>(&self, checker: &mut T, flags: u32) -> Result<()> {
-        self::interpreter::eval(&self.0, checker, flags)
+        interpreter::eval(&self.0, checker, flags)
+    }
+
+    /// Returns the underlying script bytes as a Vec<u8>
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
+    /// Creates a P2PKH locking script:
+    pub fn p2pkh(pubkey_hash: &[u8]) -> Self {
+        let mut script = Script::new();
+        script.append(OP_DUP);
+        script.append(OP_HASH160);
+        script.append_data(pubkey_hash);
+        script.append(OP_EQUALVERIFY);
+        script.append(OP_CHECKSIG);
+        script
+    }
+
+    /// Creates a P2SH locking script: OP_HASH160 <script_hash> OP_EQUAL
+    pub fn p2sh(script_hash: &[u8; 20]) -> Self {
+        let mut script = Script::new();
+        script.append(op_codes::OP_HASH160);
+        script.append_slice(&script_hash[..]);
+        script.append(op_codes::OP_EQUAL);
+        script
+    }
+
+    /// Creates a Script from a hash160, assuming the redeem script is known or retrievable
+    pub fn from_hash160(hash: &[u8]) -> Self {
+        // Placeholder: In a real implementation, retrieve the actual redeem script
+        // For now, create a P2SH script using the hash
+        let mut script = Script::new();
+        script.append(op_codes::OP_HASH160);
+        script.append_data(hash);
+        script.append(op_codes::OP_EQUAL);
+        script
     }
 }
 
@@ -264,6 +303,128 @@ impl fmt::Debug for Script {
     }
 }
 
+/// Enum zur Darstellung des analysierten Skripttyps
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScriptType {
+    P2PKH([u8; 20]), // Enthält den public key hash
+    Multisig {
+        m: usize,           // Anzahl erforderlicher Signaturen
+        n: usize,           // Gesamtzahl der Schlüssel
+        pubkeys: Vec<Vec<u8>>, // Öffentliche Schlüssel
+    },
+    Unknown,
+}
+
+/// Analysiert einen P2SH-Redeem-Skript und bestimmt dessen Typ
+pub fn analyze_p2sh_redeem_script(script: &Script) -> Result<ScriptType> {
+    let bytes = script.to_bytes();
+    let len = bytes.len();
+
+    // Prüfen, ob es ein Standard-P2PKH-Skript ist (OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG)
+    if len == 25 && bytes[0] == op_codes::OP_DUP && bytes[1] == op_codes::OP_HASH160 && bytes[2] == 20 && bytes[23] == op_codes::OP_EQUALVERIFY && bytes[24] == op_codes::OP_CHECKSIG {
+        let pubkey_hash: [u8; 20] = bytes[3..23].try_into().map_err(|_| Error::BadData("Invalid pubkey hash length".to_string()))?;
+        return Ok(ScriptType::P2PKH(pubkey_hash));
+    }
+
+    // Prüfen, ob es ein Multisig-Skript ist (OP_m <pubkey1> ... <pubkeyN> OP_n OP_CHECKMULTISIG)
+    if len >= 4 && bytes[len - 1] == op_codes::OP_CHECKMULTISIG {
+        let m = (bytes[0] - op_codes::OP_1 + 1) as usize;
+        let n = (bytes[len - 2] - op_codes::OP_1 + 1) as usize;
+        if m > 0 && n >= m && n <= 20 {
+            let mut pubkeys = Vec::new();
+            let mut offset = 1; // Start nach OP_m
+            for _ in 0..n {
+                if offset >= len - 2 {
+                    return Err(Error::BadData("Invalid multisig script: insufficient data".to_string()));
+                }
+                let key_len = bytes[offset] as usize;
+                offset += 1;
+                if offset + key_len > len - 2 {
+                    return Err(Error::BadData("Invalid multisig script: key length exceeds script".to_string()));
+                }
+                let pubkey = bytes[offset..offset + key_len].to_vec();
+                if key_len != 33 && key_len != 65 {
+                    return Err(Error::BadData("Invalid public key length in multisig".to_string()));
+                }
+                pubkeys.push(pubkey);
+                offset += key_len;
+            }
+            if offset == len - 2 && bytes[offset] == (op_codes::OP_1 + n as u8 - 1) {
+                return Ok(ScriptType::Multisig { m, n, pubkeys });
+            }
+        }
+    }
+
+    Ok(ScriptType::Unknown)
+}
+
+/// Konvertiert eine P2SH-Adresse in ein transparentes Format (Bare Multisig oder P2PKH)
+pub fn convert_p2sh_to_transparent(
+    p2sh_address: &AddressForm,
+    network: Network,
+    redeem_script: &Script,
+) -> Result<(ScriptType, AddressForm)> {
+    // Schritt 1: Dekodiere die P2SH-Adresse, um den Script-Hash zu erhalten
+    let (version, script_hash) = match p2sh_address {
+        AddressForm::Bytes(bytes) => {
+            if bytes.len() != 25 {
+                return Err(Error::BadData("Invalid address length".to_string()));
+            }
+            let version = bytes[0];
+            let payload = bytes[1..21].to_vec();
+            let checksum = sha256d(&bytes[..21]);
+            if checksum.0[..4] != bytes[21..] {
+                return Err(Error::BadData("Invalid checksum".to_string()));
+            }
+            (version, payload)
+        }
+        AddressForm::Base58(s) => decode_address(s)?,
+    };
+
+    // Schritt 2: Überprüfe, ob die Adresse eine P2SH-Adresse ist
+    let expected_version = match network {
+        Network::Mainnet => constants::MAINNET_P2SH_VERSION,
+        Network::Testnet | Network::STN => constants::TESTNET_P2SH_VERSION,
+    };
+    if version != expected_version {
+        return Err(Error::BadData("Address is not a P2SH address".to_string()));
+    }
+
+    // Step 3: Verify the script hash matches the redeem script
+    let computed_hash = hash160(&redeem_script.to_bytes());
+    if computed_hash.0[..] != script_hash[..] {
+        return Err(Error::BadData("Redeem script hash does not match address".to_string()));
+    }
+
+    // Step 4: Analyze the provided redeem script
+    let script_type = analyze_p2sh_redeem_script(redeem_script)?;
+
+    // Schritt 4: Konvertiere in ein transparentes Format
+    match script_type {
+        ScriptType::P2PKH(pubkey_hash) => {
+            // Für P2PKH: Generiere die P2PKH-Adresse direkt aus dem public key hash
+            let p2pkh_address = encode_address(network, TransactionType::P2PKH, &pubkey_hash)?;
+            Ok((script_type, AddressForm::Base58(p2pkh_address.to_base58())))
+        }
+        ScriptType::Multisig { m, n, pubkeys } => {
+            // Für Multisig: Erstelle ein Bare-Multisig-Skript
+            let mut bare_script = Script::new();
+            bare_script.append((op_codes::OP_1 + m as u8 - 1).into()); // OP_m
+            for pubkey in pubkeys.iter().take(n) {
+                bare_script.append_slice(pubkey);
+            }
+            bare_script.append((op_codes::OP_1 + n as u8 - 1).into()); // OP_n
+            bare_script.append(op_codes::OP_CHECKMULTISIG);
+
+            // Konvertiere das Bare-Multisig-Skript in einen Script-Hash für eine neue Adresse
+            let bare_script_hash = hash160(&bare_script.to_bytes());
+            let bare_address = encode_address(network, TransactionType::P2SH, &bare_script_hash.0)?;
+            Ok((ScriptType::Multisig { m, n, pubkeys }, AddressForm::Base58(bare_address.to_base58())))
+        }
+        ScriptType::Unknown => Err(Error::BadData("Unsupported redeem script type".to_string())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::op_codes::*;
@@ -304,4 +465,102 @@ mod tests {
         assert!(s.0[0] == OP_PUSHDATA4 && s.0[1] == 0 && s.0[2] == 0 && s.0[3] == 1);
         assert!(s.0.len() == 65541);
     }
+
+    // use crate::util::Hash160;
+    // #[test]
+    // fn test_from_address() {
+    //     let address = "mfmKD4cP6Na7T8D87XRSiR7shA1HNGSaec"; // Testnet address
+    //     let script = Script::from_address(address).unwrap(); // or create_script_from_address
+    //     let expected_hash160 = Hash160([0x02, 0xb7, 0x48, 0x13, 0xb0, 0x47, 0x60, 0x6b, 0x4b, 0x3f,
+    //                                 0xbd, 0xfb, 0x1a, 0x6e, 0x8e, 0x05, 0x3f, 0xdb, 0x8d, 0xab]);
+    //     let expected_script = create_lock_script(&expected_hash160);
+    //     assert_eq!(script, expected_script);
+    // }
+    
+    #[test]
+    fn test_analyze_p2sh_redeem_script() {
+        // Testfall 1: P2PKH Redeem-Skript
+        let mut p2pkh_script = Script::new();
+        p2pkh_script.append(op_codes::OP_DUP);
+        p2pkh_script.append(op_codes::OP_HASH160);
+        let pubkey_hash = [0u8; 20]; // Dummy public key hash
+        p2pkh_script.append_slice(&pubkey_hash);
+        p2pkh_script.append(op_codes::OP_EQUALVERIFY);
+        p2pkh_script.append(op_codes::OP_CHECKSIG);
+
+        let result = analyze_p2sh_redeem_script(&p2pkh_script).unwrap();
+        assert_eq!(result, ScriptType::P2PKH(pubkey_hash));
+
+        // Testfall 2: Multisig Redeem-Skript (2-of-3)
+        let mut multisig_script = Script::new();
+        multisig_script.append(op_codes::OP_2);
+        let pubkey1 = vec![0x02; 33]; // Dummy compressed public key
+        let pubkey2 = vec![0x03; 33];
+        let pubkey3 = vec![0x04; 33];
+        multisig_script.append_slice(&pubkey1);
+        multisig_script.append_slice(&pubkey2);
+        multisig_script.append_slice(&pubkey3);
+        multisig_script.append(op_codes::OP_3);
+        multisig_script.append(op_codes::OP_CHECKMULTISIG);
+
+        let result = analyze_p2sh_redeem_script(&multisig_script).unwrap();
+        assert_eq!(
+            result,
+            ScriptType::Multisig {
+                m: 2,
+                n: 3,
+                pubkeys: vec![pubkey1, pubkey2, pubkey3],
+            }
+        );
+
+        // Testfall 3: Ungültiges Skript
+        let invalid_script = Script::new();
+        let result = analyze_p2sh_redeem_script(&invalid_script).unwrap();
+        assert_eq!(result, ScriptType::Unknown);
+    }
+
+    #[test]
+    fn test_convert_p2sh_to_transparent() {
+    let network = Network::Mainnet;
+
+    // Testfall 1: P2SH mit P2PKH-Redeem-Skript
+    let pubkey_hash = [0u8; 20];
+    let mut redeem_script = Script::new();
+    redeem_script.append(op_codes::OP_DUP);
+    redeem_script.append(op_codes::OP_HASH160);
+    redeem_script.append_slice(&pubkey_hash);
+    redeem_script.append(op_codes::OP_EQUALVERIFY);
+    redeem_script.append(op_codes::OP_CHECKSIG);
+    let script_hash = hash160(&redeem_script.to_bytes());
+    let p2sh_address = encode_address(network, TransactionType::P2SH, &script_hash.0).unwrap();
+    let address_form = AddressForm::Base58(p2sh_address.to_base58());
+
+    let (script_type, new_address) = convert_p2sh_to_transparent(&address_form, network, &redeem_script).unwrap();
+    assert_eq!(script_type, ScriptType::P2PKH(pubkey_hash));
+    let expected_p2pkh = encode_address(network, TransactionType::P2PKH, &pubkey_hash).unwrap();
+    assert_eq!(new_address.to_string(), expected_p2pkh.to_base58());
+
+    // Testfall 2: P2SH mit Multisig-Redeem-Skript
+    let mut multisig_script = Script::new();
+    multisig_script.append(op_codes::OP_2);
+    let pubkey1 = vec![0x02; 33];
+    let pubkey2 = vec![0x03; 33];
+    multisig_script.append_slice(&pubkey1);
+    multisig_script.append_slice(&pubkey2);
+    multisig_script.append(op_codes::OP_2);
+    multisig_script.append(op_codes::OP_CHECKMULTISIG);
+    let script_hash = hash160(&multisig_script.to_bytes());
+    let p2sh_address = encode_address(network, TransactionType::P2SH, &script_hash.0).unwrap();
+    let address_form = AddressForm::Base58(p2sh_address.to_base58());
+
+    let (script_type, _new_address) = convert_p2sh_to_transparent(&address_form, network, &multisig_script).unwrap();
+    assert_eq!(
+        script_type,
+        ScriptType::Multisig {
+            m: 2,
+            n: 2,
+            pubkeys: vec![pubkey1, pubkey2],
+        }
+    );
+}
 }

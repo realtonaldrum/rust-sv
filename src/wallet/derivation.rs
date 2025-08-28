@@ -1,12 +1,12 @@
 // Implements BIP32
 
-pub use ring::hmac as ring_hmac;
-pub use sha2::{Digest, Sha256};
-pub use secp256k1::{Secp256k1, SecretKey, PublicKey};
+use ring::hmac::{self as ring_hmac};
+use ring::digest;
+use secp256k1::{Secp256k1, SecretKey, PublicKey, Message};
 use base58::{FromBase58,ToBase58};
-use ripemd::Ripemd160;
-pub use crate::network::Network;
-pub use crate::util::Error;
+use ripemd::{Ripemd160, Digest};
+use crate::network::Network;
+use crate::util::{sha256d, Error, Hash256, Result};
 
 pub mod constants {
     pub const HARDENED_KEY_OFFSET: u32 = 0x80000000;
@@ -17,19 +17,45 @@ pub enum ExtendedKeyType {
     Private,
     Public,
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtendedKeypair {
     pub extended_private_key: String,
-    pub extended_public_key: String, 
+    pub extended_public_key: String,
+    pub private_key: Option<Vec<u8>>, // Optional, as public-only keypairs won't have this
+    pub public_key: Vec<u8>,          // Compressed public key (33 bytes)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum KeyForm {
+    Bytes,
+    Hex,
+}
 impl ExtendedKeypair {
     // Constructor for creating an ExtendedKeypair
-    pub fn new(extended_private_key: String, extended_public_key: String) -> Self {
-        ExtendedKeypair {
+    pub fn new(extended_private_key: String, extended_public_key: String) -> Result<Self> {
+        let (private_key, public_key) = if !extended_private_key.is_empty() {
+            // Decode the extended private key to get the private key bytes
+            let extended_key_obj = ExtendedKey::decode(&extended_private_key)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            let priv_key = bip32_key.get_private_key();
+            let pub_key = bip32_key.get_public_key();
+            (Some(priv_key), pub_key)
+        } else if !extended_public_key.is_empty() {
+            // Decode the extended public key to get the public key bytes
+            let extended_key_obj = ExtendedKey::decode(&extended_public_key)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            (None, bip32_key.get_public_key())
+        } else {
+            return Err(Error::Bip32Error("Both extended keys cannot be empty".to_string()));
+        };
+
+        Ok(ExtendedKeypair {
             extended_private_key,
             extended_public_key,
-        }
+            private_key,
+            public_key,
+        })
     }
 
     // Encode the keypair (e.g., return xprv/tprv or xpub/tpub based on network and type)
@@ -42,36 +68,41 @@ impl ExtendedKeypair {
     }
 
     // Decode from a string (xprv/tprv or xpub/tpub)
-    pub fn decode(s: &str, network: Network) -> Result<Self, Error> {
-        // Validate the key and network, then construct the keypair
-        // This is a placeholder; actual decoding depends on your serialization format
-        if s.starts_with("xprv") && network == Network::Mainnet {
-            Ok(ExtendedKeypair {
-                extended_private_key: s.to_string(),
-                extended_public_key: String::new(), // Compute xpub if needed
-            })
+    pub fn decode(s: &str, network: Network) -> Result<Self> {
+        let (private_key, public_key, extended_private_key, extended_public_key) = if s.starts_with("xprv") && network == Network::Mainnet {
+            let extended_key_obj = ExtendedKey::decode(s)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            let priv_key = bip32_key.get_private_key();
+            let pub_key = bip32_key.get_public_key();
+            (Some(priv_key), pub_key, s.to_string(), String::new())
         } else if s.starts_with("tprv") && network == Network::Testnet {
-            Ok(ExtendedKeypair {
-                extended_private_key: s.to_string(),
-                extended_public_key: String::new(), // Compute tpub if needed
-            })
+            let extended_key_obj = ExtendedKey::decode(s)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            let priv_key = bip32_key.get_private_key();
+            let pub_key = bip32_key.get_public_key();
+            (Some(priv_key), pub_key, s.to_string(), String::new())
         } else if s.starts_with("xpub") && network == Network::Mainnet {
-            Ok(ExtendedKeypair {
-                extended_private_key: String::new(),
-                extended_public_key: s.to_string(),
-            })
+            let extended_key_obj = ExtendedKey::decode(s)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            (None, bip32_key.get_public_key(), String::new(), s.to_string())
         } else if s.starts_with("tpub") && network == Network::Testnet {
-            Ok(ExtendedKeypair {
-                extended_private_key: String::new(),
-                extended_public_key: s.to_string(),
-            })
+            let extended_key_obj = ExtendedKey::decode(s)?;
+            let bip32_key = extended_key_obj.to_bip32_keyobject()?;
+            (None, bip32_key.get_public_key(), String::new(), s.to_string())
         } else {
-            Err(Error::Bip32Error("Invalid extended key or network mismatch".to_string()))
-        }
+            return Err(Error::Bip32Error("Invalid extended key or network mismatch".to_string()));
+        };
+
+        Ok(ExtendedKeypair {
+            extended_private_key,
+            extended_public_key,
+            private_key,
+            public_key,
+        })
     }
 
     // Get version bytes for serialization based on the extended key string
-    pub fn get_version_bytes(extended_key: &str) -> Result<[u8; 4], Error> {
+    pub fn get_version_bytes(extended_key: &str) -> Result<[u8; 4]> {
         match extended_key {
             s if s.starts_with("xprv") => Ok([0x04, 0x88, 0xad, 0xe4]), // xprv (Mainnet, private)
             s if s.starts_with("xpub") => Ok([0x04, 0x88, 0xb2, 0x1e]), // xpub (Mainnet, public)
@@ -92,15 +123,67 @@ impl ExtendedKeypair {
             (Network::STN, false) => [0x04, 0x35, 0x87, 0xcf], // tpub
         }
     }
-}
+    
+    // Get key as bytes
+    pub fn get_key_bytes(&self, is_private: bool) -> Result<Vec<u8>> {
+        let (key_str, key_type) = if is_private {
+            (&self.extended_private_key, "private")
+        } else {
+            (&self.extended_public_key, "public")
+        };
 
-/// Computes double SHA-256 hash (used for checksum)
-fn sha256d(data: &[u8]) -> [u8; 32] {
-    let hash1 = Sha256::digest(data);
-    let hash2 = Sha256::digest(&hash1);
-    let mut result = [0u8; 32];
-    result.copy_from_slice(&hash2);
-    result
+        if is_private && key_str.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let extended_key_obj = ExtendedKey::decode(key_str).map_err(|e| {
+            Error::Bip32Error(format!("Failed to decode extended {} key: {}", key_type, e))
+        })?;
+        let bip32_key = extended_key_obj.to_bip32_keyobject().map_err(|e| {
+            Error::Bip32Error(format!("Failed to convert to BIP-32 key object for {} key: {}", key_type, e))
+        })?;
+
+        Ok(if is_private {
+            bip32_key.get_private_key()
+        } else {
+            bip32_key.get_public_key()
+        })
+    }
+
+    // Get key as hex string
+    pub fn get_key_hex(&self, is_private: bool) -> Result<String> {
+        let key_bytes = self.get_key_bytes(is_private)?;
+        Ok(hex::encode(key_bytes))
+    }
+    pub fn get_private_key(&self) -> Result<String> {
+        let key = self.get_key_hex(true)?;
+        Ok(key)
+    }
+
+    pub fn get_public_key(&self) -> Result<String> {
+        let key = self.get_key_hex(false)?;
+        Ok(key)
+    }
+    pub fn get_private_key_bytes(&self) -> Result<Vec<u8>> {
+        self.get_key_bytes(true)
+    }
+
+    pub fn get_public_key_bytes(&self) -> Result<Vec<u8>> {
+        self.get_key_bytes(false)
+    }
+
+    pub fn sign(&self, message: Hash256) -> Result<Vec<u8>> {
+        let secp = Secp256k1::signing_only();
+        let private_key = self.private_key.as_ref()
+            .ok_or_else(|| Error::Bip32Error("No private key available for signing".to_string()))?;
+        let mut private_key_array = [0u8; 32];
+        private_key_array.copy_from_slice(private_key);
+        let secret_key = SecretKey::from_byte_array(private_key_array)
+            .map_err(|e| Error::Bip32Error(format!("Invalid private key: {}", e)))?;
+        let msg = Message::from_digest(message.0); // Use message.0 to get [u8; 32]
+        let signature = secp.sign_ecdsa(msg, &secret_key);
+        Ok(signature.serialize_der().to_vec())
+    }
 }
 
 /// Represents a BIP-32 extended key (private or public) as a simple 78 character long string
@@ -109,7 +192,7 @@ pub struct ExtendedKey(pub [u8; 78]);
 
 impl ExtendedKey {
     /// Converts an ExtendedKey String to a Bip32Key Object
-    pub fn to_bip32_keyobject(&self) -> Result<Bip32Key, Error> {
+    pub fn to_bip32_keyobject(&self) -> Result<Bip32Key> {
         let secp = Secp256k1::new();
 
         // Extract components from the 78-byte array
@@ -181,7 +264,7 @@ impl ExtendedKey {
     }
 
     /// Returns boolean if the key is private or not
-    pub fn is_private(&self) -> Result<bool, Error> {
+    pub fn is_private(&self) -> Result<bool> {
         let version: [u8; 4] = self.0[0..4].try_into().map_err(|_| {
             Error::Bip32Error("Invalid version bytes length".to_string())
         })?;
@@ -196,7 +279,7 @@ impl ExtendedKey {
     }
 
     /// Returns network type and Extended Key Type
-    pub fn check_keytype(&self) -> Result<(Network, ExtendedKeyType), Error> {
+    pub fn check_keytype(&self) -> Result<(Network, ExtendedKeyType)> {
         let version: [u8; 4] = self.0[0..4].try_into().map_err(|_| {
             Error::Bip32Error("Invalid version bytes length".to_string())
         })?;
@@ -211,13 +294,13 @@ impl ExtendedKey {
     }
 
     /// Encodes an extended key into a base58 string
-    pub fn encode(&self) -> Result<String, Error> {
+    pub fn encode(&self) -> Result<String> {
         base58_check_encode(&self.0)
     }
 
 
     /// Decodes an extended key from a base58 string
-    pub fn decode(s: &str) -> Result<ExtendedKey, Error> {
+    pub fn decode(s: &str) -> Result<ExtendedKey> {
         let data = s.from_base58().map_err(|e| Error::Bip32Error(format!("Base58 decode error: {:?}", e)))?;
         if data.len() != 82 {
             return Err(Error::Bip32Error(format!("Invalid extended key length: {}", data.len())));
@@ -225,7 +308,7 @@ impl ExtendedKey {
         let payload = &data[..78];
         let checksum = &data[78..82];
         let computed_checksum = sha256d(payload);
-        if checksum != &computed_checksum[..4] {
+        if checksum != &computed_checksum.0[..4] {
             return Err(Error::Bip32Error("Invalid checksum".to_string()));
         }
         let mut extended_key = ExtendedKey([0; 78]);
@@ -234,7 +317,7 @@ impl ExtendedKey {
     }
 
     
-    pub fn get_private_key(xprv: &str) -> Result<[u8; 32], Error> {
+    pub fn get_private_key(xprv: &str) -> Result<[u8; 32]> {
         let decoded = xprv.from_base58()
             .map_err(|e| Error::Bip32Error(format!("Base58 decode error: {:?}", e)))?;
 
@@ -245,7 +328,7 @@ impl ExtendedKey {
         let payload = &decoded[..78];
         let checksum = &decoded[78..82];
         let computed_checksum = sha256d(payload);
-        if checksum != &computed_checksum[..4] {
+        if checksum != &computed_checksum.0[..4] {
             return Err(Error::Bip32Error("Invalid checksum".to_string()));
         }
 
@@ -260,6 +343,49 @@ impl ExtendedKey {
         Ok(key_bytes)
     }
 
+    // Convert an xpriv or xpub to a secp256k1::PublicKey
+    pub fn get_public_key(extended_key: &str) -> Result<[u8; 33]> {
+        let decoded = extended_key
+        .from_base58()
+        .map_err(|e| Error::Bip32Error(format!("Base58 decode error: {:?}", e)))?;
+    
+    if decoded.len() != 82 {
+        return Err(Error::Bip32Error(format!("Invalid extended key length: {}", decoded.len())));
+    }
+    
+    let payload = &decoded[..78];
+    let checksum = &decoded[78..82];
+    let computed_checksum = sha256d(payload);
+    if checksum != &computed_checksum.0[..4] {
+        return Err(Error::Bip32Error("Invalid checksum".to_string()));
+    }
+    
+    if extended_key.starts_with("xprv") {
+        // For xpriv, check private key prefix and derive public key from private key
+        if decoded[45] != 0 {
+            return Err(Error::Bip32Error("Invalid private key prefix".to_string()));
+        }
+        let key_bytes: [u8; 32] = decoded[46..78]
+        .try_into()
+        .map_err(|_| Error::Bip32Error("Failed to extract 32-byte private key".to_string()))?;
+        let secret_key = SecretKey::from_byte_array(key_bytes)
+        .map_err(|e| Error::Bip32Error(format!("Invalid private key: {}", e)))?;
+            let secp = Secp256k1::signing_only();
+            let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+            Ok(public_key.serialize())
+        } else if extended_key.starts_with("xpub") {
+            // For xpub, extract 33-byte compressed public key from bytes 45..78
+            let pubkey_bytes: [u8; 33] = decoded[45..78]
+                .try_into()
+                .map_err(|_| Error::Bip32Error("Failed to extract 33-byte public key".to_string()))?;
+            // Validate the public key
+            PublicKey::from_slice(&pubkey_bytes)
+                .map_err(|e| Error::Bip32Error(format!("Invalid public key: {}", e)))?;
+            Ok(pubkey_bytes)
+        } else {
+            Err(Error::Bip32Error("Extended key must be xpriv or xpub".to_string()))
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -275,8 +401,8 @@ pub struct Bip32Key {
 }
 
 impl Bip32Key {
-    pub fn get_private_key(&self) -> Option<Vec<u8>> {
-        self.private_key.as_ref().map(|pk| pk[..].to_vec())
+    pub fn get_private_key(&self) -> Vec<u8> {
+        self.private_key.as_ref().map(|pk| pk[..].to_vec()).unwrap_or_default()
     }
 
     pub fn get_public_key(&self) -> Vec<u8> {
@@ -310,14 +436,14 @@ impl Bip32Key {
 
 // Computes the fingerprint from a public key
 fn compute_fingerprint(pubkey_bytes: &[u8]) -> [u8; 4] {
-    let hash = Sha256::digest(pubkey_bytes);
+    let hash = digest::digest(&digest::SHA256, pubkey_bytes);
     let ripemd = Ripemd160::digest(&hash);
     let mut fingerprint = [0u8; 4];
     fingerprint.copy_from_slice(&ripemd[0..4]);
     fingerprint
 }
 
-fn base58_check_encode(data: &[u8]) -> Result<String, Error> {
+fn base58_check_encode(data: &[u8]) -> Result<String> {
     // Example validation: xprv and xpub are typically 78 bytes before checksum
     if data.len() != 78 {
         return Err(Error::Bip32Error(format!("Invalid data length for base58check encoding: {}", data.len())));
@@ -326,15 +452,14 @@ fn base58_check_encode(data: &[u8]) -> Result<String, Error> {
     payload.extend_from_slice(data);
     
     // Calculate checksum
-    let hash1 = sha2::Sha256::digest(data);
-    let hash2 = sha2::Sha256::digest(&hash1);
-    payload.extend_from_slice(&hash2[..4]);
+    let hash = sha256d(&payload);
+    payload.extend_from_slice(&hash.0[..4]);
 
     Ok(payload.to_base58())
 }
 
 // Validates and decodes a Base58Check-encoded extended key
-fn decode_extended_key(input: &str) -> Result<(Vec<u8>, [u8; 4]), Error> {
+fn decode_extended_key(input: &str) -> Result<(Vec<u8>, [u8; 4])> {
     let data = input
         .from_base58()
         .map_err(|e| Error::Bip32Error(format!("Invalid base58: {:?}", e)))?;
@@ -343,9 +468,8 @@ fn decode_extended_key(input: &str) -> Result<(Vec<u8>, [u8; 4]), Error> {
     }
     let payload = &data[..78];
     let checksum = &data[78..82];
-    let hash1 = Sha256::digest(payload);
-    let hash2 = Sha256::digest(&hash1);
-    if checksum != &hash2[..4] {
+    let hash = sha256d(payload);
+    if checksum != &hash.0[..4] {
         return Err(Error::Bip32Error("Invalid checksum".to_string()));
     }
     let mut version = [0u8; 4];
@@ -362,7 +486,7 @@ fn derive_child_key(
     depth: &mut u8,
     index: u32,
     hardened: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let secp = Secp256k1::new();
     if hardened && private_key.is_none() {
         return Err(Error::Bip32Error("Cannot derive hardened keys from public key".to_string()));
@@ -406,12 +530,49 @@ fn derive_child_key(
     Ok(())
 }
 
-// Powerful function that handles bascially everything you need
+// Normalize path: convert "m" or Empty String into "m/" else add / at the end if not
+fn normalize_path(derivation_path: &str) -> Result<String> {
+
+    let normalized_path_2 = if derivation_path.is_empty() {
+        "m/".to_string()
+    } else if derivation_path.ends_with("]") {
+        "m/".to_string()
+    } else if !derivation_path.ends_with('/') {
+    format!("{}/", derivation_path)
+    } else {
+        derivation_path.to_string()
+    };
+    
+    // println!("DEBUG - normalized_path_2: {}", normalized_path_2);
+
+    // Convert path starting with "path/" to start with "m/"
+    let normalized_path = if normalized_path_2.starts_with("path/") {
+        format!("m/{}", &normalized_path_2[5..])
+    } else {
+        normalized_path_2.clone()
+    };
+
+    // Validate path
+    if !normalized_path.is_empty() && !normalized_path.starts_with("m/") {
+        return Err(Error::Bip32Error("Path must start with 'm/'".to_string()));
+    }
+    let re = regex::Regex::new(r"^m(/(\d+[']?))*/?$").map_err(|e| Error::Bip32Error(format!("Regex error: {}", e)))?;
+    if !normalized_path.is_empty() && !re.is_match(&normalized_path) {
+        return Err(Error::Bip32Error("Invalid derivation path format".to_string()));
+    }
+
+    // println!("DEBUG - normalized_path: {}", normalized_path);
+    Ok(normalized_path)
+}
+
+/// Powerful function that handles bascially everything you need
+/// Converts Extended Derivation Path into Normal Derivationpath
 pub fn derive_seed_or_extended_key(
     input: &str,
-    path: &str,
+    derivation_path: &str,
     network: Network,
-) -> Result<ExtendedKeypair, Error> {
+) -> Result<ExtendedKeypair> {
+    
     // INIT
     let secp = Secp256k1::new();
     let mut depth: u8 = 0;
@@ -422,30 +583,8 @@ pub fn derive_seed_or_extended_key(
     let mut chain_code: [u8; 32] = [0; 32]; // Initialize chain_code to zeros
     let mut parent_fingerprint: [u8; 4] = [0; 4];
 
-    // Normalize path: convert "m" or Empty String into to "m/" else add / at the end if not
-    let normalized_path_2 = if path.is_empty() {
-        format!("m/")
-    } else if !path.ends_with('/') {
-        format!("{}/", path)
-    } else {
-        path.to_string()
-    };
-
-    // Convert path starting with "path" to start with "m"
-    let normalized_path = if normalized_path_2.starts_with("path") {
-        format!("m{}", &normalized_path_2[4..])
-    } else {
-        normalized_path_2.clone()
-    };
-
-    // Validate path
-    if !normalized_path.is_empty() && !normalized_path.starts_with("m"){
-        return Err(Error::Bip32Error("Path must start with 'm'".to_string()));
-    }
-    let re = regex::Regex::new(r"^m(/(\d+[']?))*/?$").map_err(|e| Error::Bip32Error(format!("Regex error: {}", e)))?;
-    if !normalized_path.is_empty() && !re.is_match(&normalized_path) {
-        return Err(Error::Bip32Error("Invalid derivation path format".to_string()));
-    }
+    // Normalize derivation path
+    let normalized_path = normalize_path(derivation_path)?;
 
     // Determine if input is a seed (hex) or extended key (xprv/xpub/tprv/tpub)
 
@@ -496,7 +635,9 @@ pub fn derive_seed_or_extended_key(
         };
         return Ok(ExtendedKeypair {
             extended_private_key: if is_private { input.to_string() } else { String::new() },
-            extended_public_key
+            extended_public_key,
+            private_key: private_key.map(|pk| pk[..].to_vec()),
+            public_key: public_key.unwrap().serialize().to_vec(),
         });
     }
 } else {
@@ -582,5 +723,295 @@ for part in path_parts {
         String::new()
     };
             
-    Ok(ExtendedKeypair { extended_private_key, extended_public_key })
+    Ok(ExtendedKeypair {
+        extended_private_key,
+        extended_public_key,
+        private_key: private_key.map(|pk| pk[..].to_vec()),
+        public_key: pubkey.serialize().to_vec(),
+    })
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::wallet::derivation::*;
+
+    const SEED: &str = "697fce933855df6dc5f0490c8370157af5af4af1b5f20d5c6ec7f5c1d04b859e2389bdf68fd956fd9dede46d9aa9af114b23cec6a69c8905e84c2e6376e19eb7";
+    const EXPECTED_MASTER_PRIV: &str = "xprv9s21ZrQH143K4aC15QhGLbgXYMdLskEFQ3rJ8ucq8uPE5zqoih5rSUWALU2CrgbGAQxiApmw6tE3DUgm7G2Ns2CPusPkfNKLJE7LX9TVoTs";
+    // const EXPECTED_MASTER_PUB: &str = "xpub661MyMwAqRbcG1aFeagSFNez4qTtKphtoRMUwAvc2HdyJx6TD18azgdLDqNQNxxb9So1MEfG8oRn2ryuzCB4GFt87Lhh5wWy9r5g6xEVdrD";
+
+    /// You need to know the derivation path from the master xpriv for this
+    const EXPECTED_CHILD_PRIV : &str = "xprv9zPYpnKVEEdo5PJuiPNM3LjjZuJqnUd5CQ14MHr7aa26GWHDQpua1HMyJsnWg3unmmsBEQwDQPMfkDB3TtaNM6Ao4G5dGJzZzDYMWFe33LW";
+
+    #[test]
+    fn test_master_xpriv_from_seed()  -> Result<()> {
+        let master_keypair_1 = derive_seed_or_extended_key(SEED, "", Network::Mainnet);
+        assert_eq!(
+            master_keypair_1.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+
+        let master_keypair_2 = derive_seed_or_extended_key(SEED, "m", Network::Mainnet);
+        assert_eq!(
+            master_keypair_2.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+
+        let master_keypair_3 = derive_seed_or_extended_key(SEED, "m/", Network::Mainnet);
+        assert_eq!(
+            master_keypair_3.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+
+        let master_keypair_4 = derive_seed_or_extended_key(EXPECTED_MASTER_PRIV, "", Network::Mainnet);
+        assert_eq!(
+            master_keypair_4.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+
+        let master_keypair_5 = derive_seed_or_extended_key(EXPECTED_MASTER_PRIV, "m", Network::Mainnet);
+        assert_eq!(
+            master_keypair_5.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+
+        let master_keypair_6 = derive_seed_or_extended_key(EXPECTED_MASTER_PRIV, "m/", Network::Mainnet);
+        assert_eq!(
+            master_keypair_6.unwrap().extended_private_key,
+            EXPECTED_MASTER_PRIV
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode_decode() -> Result<()> {
+        let network = Network::Testnet;
+        let keypair = derive_seed_or_extended_key(SEED, "m/", network)?;
+
+        for (is_private, label) in [(true, ExtendedKeyType::Private), (false, ExtendedKeyType::Public)] {
+            let encoded = keypair.encode(is_private);
+            println!("Encoded {:?} key: {:?}", label, encoded);
+
+            let decoded = ExtendedKeypair::decode(&encoded, network)?;
+            match is_private {
+                true => {
+                    println!("Decoded private key: {:?}", decoded.extended_private_key);
+                    assert_eq!(keypair.extended_private_key, decoded.extended_private_key);
+                }
+                false => {
+                    println!("Decoded public key:  {:?}", decoded.extended_public_key);
+                    assert_eq!(keypair.extended_public_key, decoded.extended_public_key);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pubkey_from_xprv() -> Result<()> {
+        let secp = Secp256k1::new();
+
+        let private_key_arr = ExtendedKey::get_private_key(EXPECTED_MASTER_PRIV)?;
+        println!("Private key: {:?}", private_key_arr);
+        let secret_key = SecretKey::from_byte_array(private_key_arr)?;
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+
+        println!("Public key: {}", hex::encode(public_key.serialize()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_normal_private_derivation()  -> Result<()> {
+        let child = derive_seed_or_extended_key(SEED,"m/0", Network::Mainnet)?;
+        assert!(
+            child.extended_private_key.starts_with("xprv"),
+            "Expected private key version (xprv)"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_unusual_but_valid_path_writings()  -> Result<()> {
+        let master_keypair = derive_seed_or_extended_key(SEED, "", Network::Mainnet)?;
+        let derived_keypair = derive_seed_or_extended_key(EXPECTED_MASTER_PRIV, "m/44/0/0/", Network::Mainnet)?;
+
+        println!("Master  Keypair: {:?}", master_keypair);
+        println!("Child   Keypair: {:?}", derived_keypair);
+
+        assert_eq!(
+            master_keypair.extended_private_key,
+            EXPECTED_MASTER_PRIV,
+            "Master key does not match expected value"
+        );
+        assert_eq!(
+            derived_keypair.extended_private_key,
+            EXPECTED_CHILD_PRIV,
+            "Derived key does not match expected value"
+        );
+        assert!(
+            derived_keypair.extended_private_key.starts_with("xprv"),
+            "Expected private key version (xprv)"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_derive_nonhardended_on_mainnet() -> Result<()> {
+        let master_keypair = derive_seed_or_extended_key(SEED, "m/", Network::Mainnet)?;
+        if master_keypair.extended_private_key != EXPECTED_MASTER_PRIV {
+            println!("Master xprv dont match: {}", master_keypair.extended_private_key);
+        }
+        let derived_0 = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/", Network::Mainnet)?;
+        if derived_0.extended_private_key != EXPECTED_MASTER_PRIV {
+            println!("Derived xprv dont match: {}", derived_0.extended_private_key);
+        }
+
+        let derived_1 = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/44", Network::Mainnet)?;
+        let expected_derived_1 = "xprv9vJrExfEY674BDfrZQHQwRJjGbm6ctqVq6jZfvNw4PKTjpPSvhrATjEkxUBkD7SNYV3r9hpjXDLW5NxirMDFSRXv546brK1zpaF8kBZb9bn"; // Replace with actual derived xprv
+        if derived_1.extended_private_key != expected_derived_1 {
+            println!("Derived xprv dont match: {}", expected_derived_1);
+        }
+
+        let derived_3 = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/44/0/0", Network::Mainnet)?;
+        let expected_derived_3 = "xprv9zQBrJrMTvL2moMyWteT2YcUr5cad7RUUkXtgWyMpGStCCQq1EDXDU8YmnRUrxxx59TKKx4wEuSmS1Fm7QPBHxoAM7SFRG5H1A5xTeEi4Yw"; // Replace with actual derived xprv
+        if derived_3.extended_private_key != expected_derived_3 {
+            println!("Derived xprv dont match: {}", derived_3.extended_private_key);
+        }
+
+        assert_eq!(
+            master_keypair.extended_private_key,
+            EXPECTED_MASTER_PRIV,
+            "Master key does not match expected value"
+        );
+        assert_eq!(
+            derived_0.extended_private_key,
+            EXPECTED_MASTER_PRIV,
+            "Derived key does not match expected value"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_derivation_step_by_step_mainnet() -> Result<()> {
+        let master_keypair = derive_seed_or_extended_key(SEED, "m/", Network::Mainnet)?;
+        assert_eq!(master_keypair.extended_private_key, EXPECTED_MASTER_PRIV, "Master key mismatch");
+
+        let m = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/", Network::Mainnet)?;
+        assert_eq!(m.extended_private_key, EXPECTED_MASTER_PRIV, "Master key mismatch");
+
+        let m_44 = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/44", Network::Mainnet)?;
+        println!("m/44 xprv: {}", m_44.extended_private_key);
+        let m_44_0 = derive_seed_or_extended_key(&m_44.extended_private_key, "m/0", Network::Mainnet)?;
+        println!("m/44/0 xprv: {}", m_44_0.extended_private_key);
+        let derived = derive_seed_or_extended_key(&m_44_0.extended_private_key, "m/0", Network::Mainnet)?;
+        println!("m/44/0/0 xprv: {}", derived.extended_private_key);
+
+        // let correct_expected_derived = "xprv9zPYpnKVEEdo5PJuiPNM3LjjZuJqnUd5CQ14MHr7aa26GWHDQpua1HMyJsnWg3unmmsBEQwDQPMfkDB3TtaNM6Ao4G5dGJzZzDYMWFe33LW";
+        // let uncorrect_expected_derived = "xprv9zKZ4Ycu1DUYWyJqPZLh9ZYiZs3K5kpvRHXoJCUSwNFwwKVbUVH5WNUg1SJdKJxFWo9X2KGBBhJXdNecQANJAidRXrN8Mju8LzQf4KmbebU";
+        assert_eq!(derived.extended_private_key, EXPECTED_CHILD_PRIV, "Derived key mismatch");
+        Ok(())
+    }
+
+    #[test]
+    fn test_nonhardened_derivation_on_testnet() -> Result<()> {
+        let master_keypair = derive_seed_or_extended_key(SEED, "m", Network::Testnet)?;
+        let derived_keypair = derive_seed_or_extended_key(&master_keypair.extended_private_key, "m/44/0/0/", Network::Testnet)?;
+        assert!(master_keypair.extended_private_key.starts_with("tprv"), "Expected testnet private key version (tprv)");
+        assert!(derived_keypair.extended_private_key.starts_with("tprv"), "Expected testnet private key version (tprv)");
+        Ok(())
+    }
+
+
+
+    // #[test]
+    // fn test_hmac_manual()  -> Result<()> {
+    //     let private_key = [
+    //         232, 243, 46, 114, 61, 236, 244, 5, 26, 239, 172, 142, 44, 147, 201, 197, 178, 20, 49,
+    //         56, 23, 205, 176, 26, 20, 148, 185, 23, 200, 67, 107, 53,
+    //     ];
+    //     let index = 0x80000000u32;
+    //     let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
+    //     data[0] = 0;
+    //     data[1..33].copy_from_slice(&private_key[..32]);
+    //     data[33..37].copy_from_slice(&index.to_be_bytes());
+    //     assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
+
+    //     // Compute input checksum
+    //     let input_checksum = Sha256::digest(&data);
+    //     eprintln!(
+    //         "HMAC input checksum: {}",
+    //         hex::encode(input_checksum.to_vec())
+    //     );
+
+    //     // Compute HMAC with ring
+    //     let hmac_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, SEED.as_bytes());
+    //     let result = ring_hmac::sign(&hmac_key, &data[..37]);
+    //     let result_bytes = result.as_ref();
+    //     eprintln!(
+    //         "HMAC result: {} (len: {})",
+    //         hex::encode(result_bytes),
+    //         result_bytes.len()
+    //     );
+
+    //     assert_eq!(
+    //         hex::encode(result_bytes),
+    //         "04bfb2dd60fa8921c2a4085ec15507a921f49cdc839f27f0f280e9c1495d44b547fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+    //     );
+    //     Ok(())
+    // }
+
+    // #[test]
+    // fn test_hmac()  -> Result<()> {
+    //     let private_key = [
+    //         232, 243, 46, 114, 61, 236, 244, 5, 26, 239, 172, 142, 44, 147, 201, 197, 178, 20, 49,
+    //         56, 23, 205, 176, 26, 20, 148, 185, 23, 200, 67, 107, 53,
+    //     ];
+    //     let index = 0x80000000u32; // Hardened index
+    //     let mut data = vec![0u8; 37]; // Pre-allocate 37 bytes
+    //     data[0] = 0;
+    //     data[1..33].copy_from_slice(&private_key[..32]);
+    //     data[33..37].copy_from_slice(&index.to_be_bytes());
+    //     assert_eq!(data.len(), 37, "HMAC data length should be 37 bytes");
+
+    //     // Compute input checksum
+    //     let input_checksum = Sha256::digest(&data);
+    //     eprintln!(
+    //         "HMAC input checksum: {}",
+    //         hex::encode(input_checksum.to_vec())
+    //     );
+
+    //     // Compute HMAC with ring
+    //     let hmac_key = ring_hmac::Key::new(ring_hmac::HMAC_SHA512, SEED.as_bytes());
+    //     let result = ring_hmac::sign(&hmac_key, &data[..37]);
+    //     let result_bytes = result.as_ref();
+    //     eprintln!(
+    //         "HMAC result: {} (len: {})",
+    //         hex::encode(result_bytes),
+    //         result_bytes.len()
+    //     );
+
+    //     assert_eq!(
+    //         hex::encode(result_bytes),
+    //         "04bfb2dd60fa8921c2a4085ec15507a921f49cdc839f27f0f280e9c1495d44b547fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"
+    //     );
+    //     Ok(())
+    // }
+
+    #[test]
+    fn test_transform_path() -> Result<(), Error> {
+        let input = "m/[0:103,104,105,106,107;]";
+        let expected = "path/[0:103,104,105,106,107;]";
+        let result = transform_path(input)?;
+        assert_eq!(result, expected);
+
+        let input = "m";
+        let expected = "m";
+        let result = transform_path(input)?;
+        assert_eq!(result, expected);
+
+        Ok(())
+    }
 }
